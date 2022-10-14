@@ -1,15 +1,15 @@
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Point3 {
-    x: f32,
-    y: f32,
-    z: f32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Dir3 {
-    x: f32,
-    y: f32,
-    z: f32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 impl Point3 {
@@ -79,7 +79,7 @@ impl std::ops::Sub<Point3> for Point3 {
     type Output = Dir3;
 
     fn sub(self, rhs: Point3) -> Self::Output {
-        Dir3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+        Dir3::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
     }
 }
 
