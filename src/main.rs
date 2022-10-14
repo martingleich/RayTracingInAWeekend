@@ -29,13 +29,17 @@ fn hit_sphere(center: Point3, radius: f32, ray: Ray) -> f32 {
 }
 
 fn ray_color(ray: Ray) -> Color {
-    let t = hit_sphere(Point3::new(0.0, 0.0, -1.0), 0.5, ray);
+    let center = Point3::ORIGIN + Dir3::FORWARD;
+    let t = hit_sphere(center, 0.5, ray);
     if t > 0.0 {
-        let n = (ray.at(t) - Point3::new(0.0, 0.0, -1.0)).unit();
-        return 0.5 * Color::new_rgb(n.x+1.0, n.y+1.0, n.z+1.0);
+        let n = (ray.at(t) - center).unit();
+        return 0.5 * Color::new_rgb(
+            Dir3::dot(n, Dir3::UP) + 1.0,
+            Dir3::dot(n, Dir3::RIGHT) + 1.0,
+            Dir3::dot(n, Dir3::FORWARD) + 1.0)
     }
-    let unit_direction = ray.direction.unit();
-    let t = 0.5 * (Dir3::dot(Dir3::UNIT_Y, unit_direction) + 1.0);
+    let unit_direction = ray.direction.unit(); 
+    let t = 0.5 * (Dir3::dot(Dir3::UP, unit_direction) + 1.0);
     let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
     let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
 
@@ -52,18 +56,18 @@ fn main() -> Result<(), std::io::Error> {
     let viewport_width = aspect_ratio * viewport_height;
     let focal_length = 1.0;
 
-    let origin = Point3::ZERO;
-    let horizontal = viewport_width * Dir3::UNIT_X;
-    let vertical = viewport_height * Dir3::UNIT_Y;
-    let depth = focal_length * Dir3::UNIT_Z;
-    let upper_left_corner = horizontal * -0.5 + vertical * 0.5 - depth;
+    let origin = Point3::ORIGIN;
+    let right = Dir3::RIGHT.with_length(viewport_width);
+    let up = Dir3::UP.with_length(viewport_height);
+    let forward = Dir3::FORWARD.with_length(focal_length);
+    let upper_left_corner = right * -0.5 + up * 0.5 + forward;
 
     let camera = |ix: i32, iy: i32| -> Ray {
         let ify = iy as f32 / (image_height - 1) as f32;
         let ifx = ix as f32 / (image_width - 1) as f32;
         Ray {
             origin,
-            direction: upper_left_corner + ifx * horizontal - ify * vertical,
+            direction: upper_left_corner + ifx * right - ify * up,
         }
     };
 

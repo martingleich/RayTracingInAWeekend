@@ -1,15 +1,15 @@
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Point3 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    x: f32,
+    y: f32,
+    z: f32,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Dir3 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    x: f32,
+    y: f32,
+    z: f32,
 }
 
 impl Point3 {
@@ -17,7 +17,7 @@ impl Point3 {
         Point3 { x, y, z }
     }
 
-    pub const ZERO: Point3 = Point3 {
+    pub const ORIGIN: Point3 = Point3 {
         x: 0.0,
         y: 0.0,
         z: 0.0,
@@ -34,17 +34,32 @@ impl Dir3 {
         y: 0.0,
         z: 0.0,
     };
-    pub const UNIT_X: Dir3 = Dir3 {
+    pub const RIGHT: Dir3 = Dir3 {
         x: 1.0,
         y: 0.0,
         z: 0.0,
     };
-    pub const UNIT_Y: Dir3 = Dir3 {
+    pub const LEFT: Dir3 = Dir3 {
+        x: -1.0,
+        y: 0.0,
+        z: 0.0,
+    };
+    pub const UP: Dir3 = Dir3 {
         x: 0.0,
         y: 1.0,
         z: 0.0,
     };
-    pub const UNIT_Z: Dir3 = Dir3 {
+    pub const DOWN: Dir3 = Dir3 {
+        x: 0.0,
+        y: -1.0,
+        z: 0.0,
+    };
+    pub const FORWARD: Dir3 = Dir3 {
+        x: 0.0,
+        y: 0.0,
+        z: -1.0,
+    };
+    pub const BACKWARD: Dir3 = Dir3 {
         x: 0.0,
         y: 0.0,
         z: 1.0,
@@ -71,7 +86,10 @@ impl Dir3 {
     }
 
     pub fn unit(self) -> Dir3 {
-        self / self.length()
+        self.with_length(1.0)
+    }
+    pub fn with_length(self, length:f32) -> Dir3 {
+        self * (length / self.length())
     }
 }
 
