@@ -71,7 +71,7 @@ impl Dir3 {
     }
 
     pub fn unit(self) -> Dir3 {
-        self / self.length_squared()
+        self / self.length()
     }
 }
 
@@ -80,6 +80,14 @@ impl std::ops::Sub<Point3> for Point3 {
 
     fn sub(self, rhs: Point3) -> Self::Output {
         Dir3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    }
+}
+
+impl std::ops::Sub<Dir3> for Point3 {
+    type Output = Point3;
+
+    fn sub(self, rhs: Dir3) -> Self::Output {
+        Point3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
     }
 }
 
@@ -208,5 +216,17 @@ impl std::ops::Div<f32> for Dir3 {
 
     fn div(self, rhs: f32) -> Self::Output {
         self * (1.0 / rhs)
+    }
+}
+
+impl std::ops::Neg for Dir3 {
+    type Output = Dir3;
+
+    fn neg(self) -> Self::Output {
+        Dir3 {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
     }
 }
