@@ -15,7 +15,18 @@ fn lerp<T: std::ops::Add<Output = T> + std::ops::Mul<f32, Output = T>>(a: T, b: 
     a * (1.0 - t) + b * t
 }
 
+fn hit_sphere(center: Point3, radius: f32, ray: Ray) -> bool {
+    let oc = ray.origin - center;
+    let a = ray.direction.length_squared();
+    let b = Dir3::dot(oc, ray.direction);
+    let c = oc.length_squared() - radius * radius;
+    b * b > a * c
+}
+
 fn ray_color(ray: Ray) -> Color {
+    if hit_sphere(Point3::new(0.0, 0.0, -1.0), 0.5, ray) {
+        return Color::new_rgb(1.0, 0.0, 0.0);
+    }
     let unit_direction = ray.direction.unit();
     let t = 0.5 * (Dir3::dot(Dir3::UNIT_Y, unit_direction) + 1.0);
     let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
