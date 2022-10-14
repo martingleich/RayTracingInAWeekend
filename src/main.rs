@@ -1,6 +1,12 @@
+mod color;
+mod vec3;
+mod ray;
+
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
+
+use color::Color;
 
 fn main() -> Result<(), std::io::Error> {
     let path = Path::new("output/image.ppm");
@@ -13,15 +19,15 @@ fn main() -> Result<(), std::io::Error> {
 
     for i in 0..image_height {
         for j in 0..image_width {
-            let r = i as f32 / (image_width - 1) as f32;
-            let g = j as f32 / (image_height - 1) as f32;
-            let b = 0.25;
+            let c = Color::new_rgb(
+                i as f32 / (image_width - 1) as f32,
+                j as f32 / (image_height - 1) as f32,
+                0.25,
+            );
+            let v = &c;
 
-            let ir = (r * 255.999) as i32;
-            let ig = (g * 255.999) as i32;
-            let ib = (b * 255.999) as i32;
-
-            out.write_all(&format!("{ir} {ig} {ib}\n").as_bytes())?;
+            out.write_all(c.to_ppm_string().as_bytes())?;
+            out.write_all("\n".as_bytes())?;
         }
     }
     out.flush()?;
