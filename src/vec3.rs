@@ -88,7 +88,7 @@ impl Dir3 {
     pub fn unit(self) -> Dir3 {
         self.with_length(1.0)
     }
-    pub fn with_length(self, length:f32) -> Dir3 {
+    pub fn with_length(self, length: f32) -> Dir3 {
         self * (length / self.length())
     }
 }
