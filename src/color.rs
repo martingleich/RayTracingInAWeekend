@@ -6,8 +6,8 @@ pub struct Color {
 }
 
 impl Color {
-    pub fn new_rgb(r: f32, g: f32, b: f32) -> Color {
-        Color { r, g, b }
+    pub fn new_rgb(r: f32, g: f32, b: f32) -> Self {
+        Self { r, g, b }
     }
 
     pub fn to_ppm_string(self) -> String {
@@ -16,6 +16,12 @@ impl Color {
         let ib = (self.b * 255.999) as i32;
         format!("{ir} {ig} {ib}")
     }
+
+    pub const BLACK: Color = Self {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+    };
 }
 
 impl std::ops::Add<Color> for Color {
@@ -71,5 +77,15 @@ impl std::ops::Div<f32> for Color {
 
     fn div(self, rhs: f32) -> Self::Output {
         self * (1.0 / rhs)
+    }
+}
+
+impl std::iter::Sum for Color {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut result = Color::BLACK;
+        for x in iter {
+            result += x;
+        }
+        return result;
     }
 }

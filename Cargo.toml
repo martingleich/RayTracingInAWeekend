@@ -10,3 +10,4 @@ name="ray_tracing_in_a_weekend"
 path="src/main.rs"
 
 [dependencies]
+rand="0.8.5"

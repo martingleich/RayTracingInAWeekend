@@ -12,6 +12,7 @@ use hittable::Hittable;
 use hittable::HittableList;
 use hittable::Sphere;
 
+use rand::Rng;
 use ray::Ray;
 use vec3::Dir3;
 use vec3::Point3;
@@ -42,6 +43,8 @@ fn main() -> Result<(), std::io::Error> {
     let path = Path::new("output/image.ppm");
     let image_width = 400;
     let image_height = 225;
+    let samples_per_pixel = 100;
+
     let aspect_ratio = image_width as f32 / image_height as f32;
 
     let viewport_height = 2.0;
@@ -54,9 +57,7 @@ fn main() -> Result<(), std::io::Error> {
     let forward = Dir3::FORWARD.with_length(focal_length);
     let upper_left_corner = right * -0.5 + up * 0.5 + forward;
 
-    let camera = |ix: i32, iy: i32| -> Ray {
-        let ify = iy as f32 / (image_height - 1) as f32;
-        let ifx = ix as f32 / (image_width - 1) as f32;
+    let camera = |ifx: f32, ify: f32| -> Ray {
         Ray {
             origin,
             direction: upper_left_corner + ifx * right - ify * up,
@@ -67,16 +68,28 @@ fn main() -> Result<(), std::io::Error> {
     world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5));
     world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 1000.5, 1000.0));
 
+    let dist_x = rand::distributions::Uniform::new(0.0, 1.0 / (image_width - 1) as f32);
+    let dist_y = rand::distributions::Uniform::new(0.0, 1.0 / (image_height - 1) as f32);
+    let mut rnd = rand::thread_rng();
+
     let mut out = OpenOptions::new().write(true).create(true).open(path)?;
 
     out.write_all(format!("P3\n{image_width} {image_height}\n255\n").as_bytes())?;
 
-    for i in 0..image_height {
-        for j in 0..image_width {
-            let ray = camera(j, i);
-            let c = ray_color(ray, &world);
+    for iy in 0..image_height {
+        let ify = (iy as f32) / (image_height - 1) as f32;
+        for ix in 0..image_width {
+            let ifx = (ix as f32) / (image_width - 1) as f32;
 
-            out.write_all(c.to_ppm_string().as_bytes())?;
+            let pixel_color: Color = (0..samples_per_pixel)
+                .map(|_| {
+                    let ray = camera(ifx + rnd.sample(dist_x), ify + rnd.sample(dist_y));
+                    ray_color(ray, &world)
+                })
+                .sum::<Color>()
+                / (samples_per_pixel as f32);
+
+            out.write_all(pixel_color.to_ppm_string().as_bytes())?;
             out.write_all("\n".as_bytes())?;
         }
     }
