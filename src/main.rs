@@ -1,4 +1,5 @@
 mod color;
+mod hittable;
 mod ray;
 mod vec3;
 
@@ -7,6 +8,10 @@ use std::io::Write;
 use std::path::Path;
 
 use color::Color;
+use hittable::Hittable;
+use hittable::HittableList;
+use hittable::Sphere;
+
 use ray::Ray;
 use vec3::Dir3;
 use vec3::Point3;
@@ -15,30 +20,17 @@ fn lerp<T: std::ops::Add<Output = T> + std::ops::Mul<f32, Output = T>>(a: T, b: 
     a * (1.0 - t) + b * t
 }
 
-fn hit_sphere(center: Point3, radius: f32, ray: Ray) -> f32 {
-    let oc = ray.origin - center;
-    let a = ray.direction.length_squared();
-    let half_b = Dir3::dot(oc, ray.direction);
-    let c = oc.length_squared() - radius * radius;
-    let disc = half_b*half_b - a*c;
-    if disc < 0.0 {
-        return -1.0;
-    } else {
-        return (-half_b - disc.sqrt()) / a;
+fn ray_color<THit: Hittable>(ray: Ray, world: &THit) -> Color {
+    if let Some(interaction) = world.hit(ray, 0.0, f32::INFINITY) {
+        let n = interaction.normal;
+        return 0.5
+            * Color::new_rgb(
+                Dir3::dot(n, Dir3::RIGHT) + 1.0,
+                Dir3::dot(n, Dir3::UP) + 1.0,
+                Dir3::dot(n, Dir3::FORWARD) + 1.0,
+            );
     }
-}
-
-fn ray_color(ray: Ray) -> Color {
-    let center = Point3::ORIGIN + Dir3::FORWARD;
-    let t = hit_sphere(center, 0.5, ray);
-    if t > 0.0 {
-        let n = (ray.at(t) - center).unit();
-        return 0.5 * Color::new_rgb(
-            Dir3::dot(n, Dir3::UP) + 1.0,
-            Dir3::dot(n, Dir3::RIGHT) + 1.0,
-            Dir3::dot(n, Dir3::FORWARD) + 1.0)
-    }
-    let unit_direction = ray.direction.unit(); 
+    let unit_direction = ray.direction.unit();
     let t = 0.5 * (Dir3::dot(Dir3::UP, unit_direction) + 1.0);
     let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
     let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
@@ -71,6 +63,10 @@ fn main() -> Result<(), std::io::Error> {
         }
     };
 
+    let mut world = HittableList::new();
+    world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5));
+    world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 1000.5, 1000.0));
+
     let mut out = OpenOptions::new().write(true).create(true).open(path)?;
 
     out.write_all(format!("P3\n{image_width} {image_height}\n255\n").as_bytes())?;
@@ -78,7 +74,7 @@ fn main() -> Result<(), std::io::Error> {
     for i in 0..image_height {
         for j in 0..image_width {
             let ray = camera(j, i);
-            let c = ray_color(ray);
+            let c = ray_color(ray, &world);
 
             out.write_all(c.to_ppm_string().as_bytes())?;
             out.write_all("\n".as_bytes())?;
