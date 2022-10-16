@@ -1,3 +1,5 @@
+use crate::math;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Color {
     r: f32,
@@ -11,9 +13,9 @@ impl Color {
     }
 
     pub fn to_ppm_string(self) -> String {
-        let ir = (self.r * 255.999) as i32;
-        let ig = (self.g * 255.999) as i32;
-        let ib = (self.b * 255.999) as i32;
+        let ir = math::clamp(0.0, 255.0, self.r * 256.0) as u8;
+        let ig = math::clamp(0.0, 255.0, self.g * 256.0) as u8;
+        let ib = math::clamp(0.0, 255.0, self.b * 256.0) as u8;
         format!("{ir} {ig} {ib}")
     }
 

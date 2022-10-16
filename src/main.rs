@@ -1,25 +1,30 @@
+mod camera;
 mod color;
 mod hittable;
+mod math;
 mod ray;
+mod size2i;
+mod vec2;
 mod vec3;
 
+use std::fmt;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 
+use camera::Camera;
 use color::Color;
 use hittable::Hittable;
 use hittable::HittableList;
 use hittable::Sphere;
 
+use rand::distributions::Uniform;
 use rand::Rng;
 use ray::Ray;
+use size2i::Size2i;
+use vec2::Vec2f;
 use vec3::Dir3;
 use vec3::Point3;
-
-fn lerp<T: std::ops::Add<Output = T> + std::ops::Mul<f32, Output = T>>(a: T, b: T, t: f32) -> T {
-    a * (1.0 - t) + b * t
-}
 
 fn ray_color<THit: Hittable>(ray: Ray, world: &THit) -> Color {
     if let Some(interaction) = world.hit(ray, 0.0, f32::INFINITY) {
@@ -36,62 +41,58 @@ fn ray_color<THit: Hittable>(ray: Ray, world: &THit) -> Color {
     let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
     let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
 
-    return lerp(sky_color, ground_color, t);
+    return math::lerp(sky_color, ground_color, t);
 }
 
 fn main() -> Result<(), std::io::Error> {
     let path = Path::new("output/image.ppm");
-    let image_width = 400;
-    let image_height = 225;
-    let samples_per_pixel = 100;
+    let image_size = Size2i::new(400, 225);
+    let samples_per_pixel = 1;
 
-    let aspect_ratio = image_width as f32 / image_height as f32;
-
-    let viewport_height = 2.0;
-    let viewport_width = aspect_ratio * viewport_height;
-    let focal_length = 1.0;
-
-    let origin = Point3::ORIGIN;
-    let right = Dir3::RIGHT.with_length(viewport_width);
-    let up = Dir3::UP.with_length(viewport_height);
-    let forward = Dir3::FORWARD.with_length(focal_length);
-    let upper_left_corner = right * -0.5 + up * 0.5 + forward;
-
-    let camera = |ifx: f32, ify: f32| -> Ray {
-        Ray {
-            origin,
-            direction: upper_left_corner + ifx * right - ify * up,
-        }
-    };
+    let viewport_width = 4.0;
+    let viewport_height = image_size.aspect_ratio() * viewport_width;
+    let camera = Camera::new(
+        viewport_width,
+        viewport_height,
+        1.0,
+        Point3::ORIGIN,
+        Dir3::UP,
+        Dir3::FORWARD,
+    );
 
     let mut world = HittableList::new();
     world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5));
     world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 1000.5, 1000.0));
 
-    let dist_x = rand::distributions::Uniform::new(0.0, 1.0 / (image_width - 1) as f32);
-    let dist_y = rand::distributions::Uniform::new(0.0, 1.0 / (image_height - 1) as f32);
+    let distr = Uniform::new(
+        Vec2f { x: 0.0, y: 0.0 },
+        Vec2f {
+            x: 1.0 / (image_size.width - 1) as f32,
+            y: 1.0 / (image_size.height - 1) as f32,
+        },
+    );
     let mut rnd = rand::thread_rng();
 
     let mut out = OpenOptions::new().write(true).create(true).open(path)?;
 
-    out.write_all(format!("P3\n{image_width} {image_height}\n255\n").as_bytes())?;
+    out.write_all(
+        fmt::format(format_args!(
+            "P3\n{} {}\n255\n",
+            image_size.width, image_size.height
+        ))
+        .as_bytes(),
+    )?;
 
-    for iy in 0..image_height {
-        let ify = (iy as f32) / (image_height - 1) as f32;
-        for ix in 0..image_width {
-            let ifx = (ix as f32) / (image_width - 1) as f32;
+    let color_at_viewport = |pixel: Vec2f| -> Color { ray_color(camera.ray(pixel), &world) };
 
-            let pixel_color: Color = (0..samples_per_pixel)
-                .map(|_| {
-                    let ray = camera(ifx + rnd.sample(dist_x), ify + rnd.sample(dist_y));
-                    ray_color(ray, &world)
-                })
-                .sum::<Color>()
-                / (samples_per_pixel as f32);
+    for f in image_size.iterf() {
+        let pixel_color: Color = (0..samples_per_pixel)
+            .map(|_| color_at_viewport(f + rnd.sample(&distr)))
+            .sum::<Color>()
+            / (samples_per_pixel as f32);
 
-            out.write_all(pixel_color.to_ppm_string().as_bytes())?;
-            out.write_all("\n".as_bytes())?;
-        }
+        out.write_all(pixel_color.to_ppm_string().as_bytes())?;
+        out.write_all("\n".as_bytes())?;
     }
     out.flush()?;
 
