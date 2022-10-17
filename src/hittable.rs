@@ -48,7 +48,8 @@ impl Hittable for Sphere {
     fn hit(&self, ray: Ray, t_min: f32, t_max: f32) -> Option<HitInteraction> {
         let maybe_t: Option<f32> = {
             let oc = ray.origin - self.center;
-            let a = ray.direction.length_squared();
+            // let a = ray.direction.length_squared();
+            let a = 1.0; // The lenght of the direction is guaranteed to be 1
             let half_b = Dir3::dot(oc, ray.direction);
             let c = oc.length_squared() - self.radius * self.radius;
             let disc = half_b * half_b - a * c;

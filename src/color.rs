@@ -12,18 +12,22 @@ impl Color {
         Self { r, g, b }
     }
 
-    pub fn to_ppm_string(self) -> String {
+    pub fn to_ppm_string(&self) -> String {
         let ir = math::clamp(0.0, 255.0, self.r * 256.0) as u8;
         let ig = math::clamp(0.0, 255.0, self.g * 256.0) as u8;
         let ib = math::clamp(0.0, 255.0, self.b * 256.0) as u8;
         format!("{ir} {ig} {ib}")
     }
 
-    pub const BLACK: Color = Self {
+    pub const BLACK: Self = Self {
         r: 0.0,
         g: 0.0,
         b: 0.0,
     };
+
+    pub fn gamma2(&self) -> Self {
+        Self::new_rgb(self.r.sqrt(), self.g.sqrt(), self.b.sqrt())
+    }
 }
 
 impl std::ops::Add<Color> for Color {

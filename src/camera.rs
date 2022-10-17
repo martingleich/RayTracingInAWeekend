@@ -33,9 +33,9 @@ impl Camera {
     }
 
     pub fn ray(&self, point: Vec2f) -> Ray {
-        Ray {
-            origin: self.position,
-            direction: self.upper_left_corner + point.x * self.right - point.y * self.up,
-        }
+        Ray::new(
+            self.position,
+            (self.upper_left_corner + point.x * self.right - point.y * self.up).unit(),
+        )
     }
 }

@@ -8,6 +8,11 @@ pub struct Ray {
 }
 
 impl Ray {
+    pub fn new(origin: Point3, direction: Dir3) -> Self {
+        debug_assert!(direction.length_squared() > 0.99 && direction.length_squared() < 1.01);
+        Self { origin, direction }
+    }
+
     pub fn at(self, t: f32) -> Point3 {
         self.origin + t * self.direction
     }

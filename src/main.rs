@@ -35,15 +35,14 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
         return Color::BLACK;
     }
     if let Some(interaction) = world.hit(ray, 0.0001, f32::INFINITY) {
-        let direction = interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng));
-        let new_ray = Ray {
-            origin: interaction.position,
+        let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng))).unit();
+        let new_ray = Ray::new(
+            interaction.position,
             direction,
-        };
+        );
         return 0.5 * ray_color(new_ray, world, rng, depth - 1);
     }
-    let unit_direction = ray.direction.unit();
-    let t = 0.5 * (Dir3::dot(Dir3::UP, unit_direction) + 1.0);
+    let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
     let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
     let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
 
@@ -86,12 +85,15 @@ fn main() -> Result<(), std::io::Error> {
     let color_at_viewport = |pixel: Vec2f, rng: &mut ThreadRng| -> Color {
         ray_color(camera.ray(pixel), &world, rng, max_depth)
     };
-    let pixels_iter = image_size.iterf().map(|f| {
-        (0..samples_per_pixel)
-            .map(|_| color_at_viewport(f + rng.sample(&distr), &mut rng))
-            .sum::<Color>()
-            / (samples_per_pixel as f32)
-    });
+    let pixels_iter = image_size
+        .iterf()
+        .map(|f| {
+            (0..samples_per_pixel)
+                .map(|_| color_at_viewport(f + rng.sample(&distr), &mut rng))
+                .sum::<Color>()
+        })
+        .map(|c| c / samples_per_pixel as f32)
+        .map(|c| c.gamma2());
     let pixels = collect_with_progress(pixels_iter, image_size.count());
 
     let out = OpenOptions::new().write(true).create(true).open(path)?;
