@@ -8,6 +8,7 @@ mod vec2;
 mod vec3;
 
 use std::fmt;
+use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
@@ -60,9 +61,12 @@ fn main() -> Result<(), std::io::Error> {
         Dir3::FORWARD,
     );
 
-    let mut world = HittableList::new();
-    world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5));
-    world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 1000.5, 1000.0));
+    let world = {
+        let mut world = HittableList::new();
+        world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5));
+        world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 1000.5, 1000.0));
+        world
+    };
 
     let distr = Uniform::new(
         Vec2f { x: 0.0, y: 0.0 },
@@ -73,8 +77,26 @@ fn main() -> Result<(), std::io::Error> {
     );
     let mut rnd = rand::thread_rng();
 
-    let mut out = OpenOptions::new().write(true).create(true).open(path)?;
+    let color_at_viewport = |pixel: Vec2f| -> Color { ray_color(camera.ray(pixel), &world) };
+    let pixels = image_size
+        .iterf()
+        .map(|f| {
+            (0..samples_per_pixel)
+                .map(|_| color_at_viewport(f + rnd.sample(&distr)))
+                .sum::<Color>()
+                / (samples_per_pixel as f32)
+        })
+        .collect::<Vec<_>>();
 
+    let out = OpenOptions::new().write(true).create(true).open(path)?;
+    write_ppm_image(out, pixels, image_size)
+}
+
+fn write_ppm_image<I: IntoIterator<Item = Color>>(
+    mut out: File,
+    pixels: I,
+    image_size: Size2i,
+) -> Result<(), std::io::Error> {
     out.write_all(
         fmt::format(format_args!(
             "P3\n{} {}\n255\n",
@@ -82,19 +104,10 @@ fn main() -> Result<(), std::io::Error> {
         ))
         .as_bytes(),
     )?;
-
-    let color_at_viewport = |pixel: Vec2f| -> Color { ray_color(camera.ray(pixel), &world) };
-
-    for f in image_size.iterf() {
-        let pixel_color: Color = (0..samples_per_pixel)
-            .map(|_| color_at_viewport(f + rnd.sample(&distr)))
-            .sum::<Color>()
-            / (samples_per_pixel as f32);
-
-        out.write_all(pixel_color.to_ppm_string().as_bytes())?;
+    for pix in pixels {
+        out.write_all(pix.to_ppm_string().as_bytes())?;
         out.write_all("\n".as_bytes())?;
     }
-    out.flush()?;
 
     Ok(())
 }
