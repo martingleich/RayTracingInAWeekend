@@ -19,7 +19,7 @@ use color::Color;
 use hittable::{HitInteraction, Hittable, HittableList, Sphere};
 
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
-use rand_distr::{Distribution, UnitSphere};
+use rand_distr::{Distribution, UnitBall, UnitSphere};
 use ray::Ray;
 use size2i::Size2i;
 use vec2::Vec2f;
@@ -36,8 +36,10 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
     }
 
     if let Some(interaction) = world.hit(ray, &(0.0001..f32::INFINITY)) {
-        if let Some(scatter) = interaction.material.scatter(ray, &interaction, rng) {
-            Color::convolution(scatter.0, ray_color(&scatter.1, world, rng, depth - 1))
+        if let Some((attentuation, scattered)) =
+            interaction.material.scatter(ray, &interaction, rng)
+        {
+            Color::convolution(attentuation, ray_color(&scattered, world, rng, depth - 1))
         } else {
             Color::BLACK
         }
@@ -73,9 +75,14 @@ impl Material {
                 Some((*albedo, scattered))
             }
             Material::Metal { albedo, fuzz } => {
-                let direction = Dir3::reflect(ray.direction, interaction.normal);
+                let fuzz_dir = if *fuzz > 0.0 {
+                    *fuzz * Dir3::new_from_arr(UnitBall.sample(rng))
+                } else {
+                    Dir3::ZERO
+                };
+                let direction = Dir3::reflect(ray.direction, interaction.normal) + fuzz_dir;
                 if Dir3::dot(direction, interaction.normal) > 0.0 {
-                    let scattered = Ray::new(interaction.position, direction);
+                    let scattered = Ray::new(interaction.position, direction.unit());
                     Some((*albedo, scattered))
                 } else {
                     None
@@ -88,16 +95,16 @@ impl Material {
 fn main() -> Result<(), std::io::Error> {
     let path = Path::new("output/image.ppm");
     let image_size = Size2i::new(400, 225);
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 500;
     let max_depth = 50;
 
-    let viewport_width = 4.0;
+    let viewport_width = 1.2;
     let viewport_height = image_size.aspect_ratio() * viewport_width;
     let camera = Camera::new(
         viewport_width,
         viewport_height,
         1.0,
-        Point3::ORIGIN,
+        Point3::ORIGIN  + Dir3::BACKWARD * 3.0,
         Dir3::UP,
         Dir3::FORWARD,
     );
@@ -111,12 +118,12 @@ fn main() -> Result<(), std::io::Error> {
             albedo: Color::new_rgb(0.7, 0.3, 0.3),
         };
         let material_left = Material::Metal {
-            albedo: Color::new_rgb(0.8, 0.8, 0.8),
+            albedo: Color::new_rgb(0.6, 0.6, 0.8),
             fuzz: 0.0,
         };
         let material_right = Material::Metal {
             albedo: Color::new_rgb(0.8, 0.6, 0.2),
-            fuzz: 0.0,
+            fuzz: 1.0,
         };
         world.push(Sphere::new(
             Point3::ORIGIN + Dir3::DOWN * 100.5,
