@@ -16,7 +16,7 @@ use std::{
 
 use camera::Camera;
 use color::Color;
-use hittable::{Hittable, HittableList, Sphere};
+use hittable::{Hittable, HittableList, Sphere, HitInteraction};
 
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 use rand_distr::{Distribution, UnitSphere};
@@ -26,7 +26,7 @@ use vec2::Vec2f;
 use vec3::{Dir3, Point3};
 
 fn ray_color<THit: Hittable, TRng: rand::Rng>(
-    ray: Ray,
+    ray: &Ray,
     world: &THit,
     rng: &mut TRng,
     depth: i32,
@@ -34,19 +34,41 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
     if depth <= 0 {
         return Color::BLACK;
     }
-    if let Some(interaction) = world.hit(ray, 0.0001, f32::INFINITY) {
-        let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng))).unit();
-        let new_ray = Ray::new(
-            interaction.position,
-            direction,
-        );
-        return 0.5 * ray_color(new_ray, world, rng, depth - 1);
-    }
-    let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
-    let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
-    let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
 
-    return math::lerp(sky_color, ground_color, t);
+    if let Some(interaction) = world.hit(ray, &(0.0001..f32::INFINITY)) {
+        if let Some(scatter) = interaction.material.scatter(ray, &interaction, rng) {
+            Color::convolution(scatter.0, ray_color(&scatter.1, world, rng, depth - 1))
+        } else {
+            Color::BLACK
+        }
+    } else {
+        // Sky
+        let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
+        let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
+        let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
+
+        math::lerp(sky_color, ground_color, t)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Material
+{
+    Lambert{albedo : Color},
+}
+
+impl Material
+{
+    pub fn scatter<TRng : Rng>(&self, ray : &Ray, interaction : &HitInteraction, rng : &mut TRng) -> Option<(Color, Ray)>
+    {
+        match self {
+            Material::Lambert { albedo } => {
+                let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng))).near_zero_or_else(interaction.normal).unit();
+                let scattered = Ray::new(interaction.position, direction);
+                Some((*albedo, scattered))
+            },
+        }
+    }
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -68,8 +90,10 @@ fn main() -> Result<(), std::io::Error> {
 
     let world = {
         let mut world = HittableList::new();
-        world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5));
-        world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 100.5, 100.0));
+        let material_ground = Material::Lambert { albedo: Color::new_rgb(0.8, 0.8, 0.8) };
+        let material_center = Material::Lambert { albedo: Color::new_rgb(0.7, 0.3, 0.3) };
+        world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5, material_center));
+        world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 100.5, 100.0, material_ground));
         world
     };
 
@@ -83,7 +107,7 @@ fn main() -> Result<(), std::io::Error> {
     let mut rng = rand::thread_rng();
 
     let color_at_viewport = |pixel: Vec2f, rng: &mut ThreadRng| -> Color {
-        ray_color(camera.ray(pixel), &world, rng, max_depth)
+        ray_color(&camera.ray(pixel), &world, rng, max_depth)
     };
     let pixels_iter = image_size
         .iterf()

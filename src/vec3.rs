@@ -96,6 +96,12 @@ impl Dir3 {
     pub fn with_length(self, length: f32) -> Self {
         self * (length / self.length())
     }
+
+    pub fn near_zero(self) -> bool {
+        let eps : f32 = 1e-8;
+        self.x.abs() < eps && self.y.abs() < eps && self.z.abs() < eps
+    }
+    pub fn near_zero_or_else(self, default: Dir3) -> Dir3 { if self.near_zero() {default} else {self} }
 }
 
 impl std::ops::Sub<Point3> for Point3 {
