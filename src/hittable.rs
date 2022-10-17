@@ -2,7 +2,8 @@ use std::ops::Range;
 
 use crate::{
     ray::Ray,
-    vec3::{Dir3, Point3}, Material,
+    vec3::{Dir3, Point3},
+    Material,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -11,11 +12,17 @@ pub struct HitInteraction {
     pub normal: Dir3,
     pub t: f32,
     pub front_face: bool,
-    pub material : Material,
+    pub material: Material,
 }
 
 impl HitInteraction {
-    pub fn new_from_ray(ray: &Ray, position: Point3, surface_normal: Dir3, t: f32, material : Material) -> Self {
+    pub fn new_from_ray(
+        ray: &Ray,
+        position: Point3,
+        surface_normal: Dir3,
+        t: f32,
+        material: Material,
+    ) -> Self {
         let front_face = Dir3::dot(surface_normal, ray.direction) < 0.0;
         let normal = if front_face {
             surface_normal
@@ -27,7 +34,7 @@ impl HitInteraction {
             normal,
             t,
             front_face,
-            material
+            material,
         }
     }
 }
@@ -40,12 +47,16 @@ pub trait Hittable {
 pub struct Sphere {
     pub center: Point3,
     pub radius: f32,
-    pub material : Material,
+    pub material: Material,
 }
 
 impl Sphere {
-    pub fn new(center: Point3, radius: f32, material : Material) -> Self {
-        Self { center, radius, material }
+    pub fn new(center: Point3, radius: f32, material: Material) -> Self {
+        Self {
+            center,
+            radius,
+            material,
+        }
     }
 }
 

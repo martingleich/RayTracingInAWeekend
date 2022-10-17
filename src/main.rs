@@ -16,7 +16,7 @@ use std::{
 
 use camera::Camera;
 use color::Color;
-use hittable::{Hittable, HittableList, Sphere, HitInteraction};
+use hittable::{HitInteraction, Hittable, HittableList, Sphere};
 
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 use rand_distr::{Distribution, UnitSphere};
@@ -52,21 +52,35 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Material
-{
-    Lambert{albedo : Color},
+pub enum Material {
+    Lambert { albedo: Color },
+    Metal { albedo: Color, fuzz: f32 },
 }
 
-impl Material
-{
-    pub fn scatter<TRng : Rng>(&self, ray : &Ray, interaction : &HitInteraction, rng : &mut TRng) -> Option<(Color, Ray)>
-    {
+impl Material {
+    pub fn scatter<TRng: Rng>(
+        &self,
+        ray: &Ray,
+        interaction: &HitInteraction,
+        rng: &mut TRng,
+    ) -> Option<(Color, Ray)> {
         match self {
             Material::Lambert { albedo } => {
-                let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng))).near_zero_or_else(interaction.normal).unit();
+                let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng)))
+                    .near_zero_or_else(interaction.normal)
+                    .unit();
                 let scattered = Ray::new(interaction.position, direction);
                 Some((*albedo, scattered))
-            },
+            }
+            Material::Metal { albedo, fuzz } => {
+                let direction = Dir3::reflect(ray.direction, interaction.normal);
+                if Dir3::dot(direction, interaction.normal) > 0.0 {
+                    let scattered = Ray::new(interaction.position, direction);
+                    Some((*albedo, scattered))
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -90,10 +104,40 @@ fn main() -> Result<(), std::io::Error> {
 
     let world = {
         let mut world = HittableList::new();
-        let material_ground = Material::Lambert { albedo: Color::new_rgb(0.8, 0.8, 0.8) };
-        let material_center = Material::Lambert { albedo: Color::new_rgb(0.7, 0.3, 0.3) };
-        world.push(Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5, material_center));
-        world.push(Sphere::new(Point3::ORIGIN + Dir3::DOWN * 100.5, 100.0, material_ground));
+        let material_ground = Material::Lambert {
+            albedo: Color::new_rgb(0.8, 0.8, 0.0),
+        };
+        let material_center = Material::Lambert {
+            albedo: Color::new_rgb(0.7, 0.3, 0.3),
+        };
+        let material_left = Material::Metal {
+            albedo: Color::new_rgb(0.8, 0.8, 0.8),
+            fuzz: 0.0,
+        };
+        let material_right = Material::Metal {
+            albedo: Color::new_rgb(0.8, 0.6, 0.2),
+            fuzz: 0.0,
+        };
+        world.push(Sphere::new(
+            Point3::ORIGIN + Dir3::DOWN * 100.5,
+            100.0,
+            material_ground,
+        ));
+        world.push(Sphere::new(
+            Point3::ORIGIN + Dir3::FORWARD,
+            0.5,
+            material_center,
+        ));
+        world.push(Sphere::new(
+            Point3::ORIGIN + Dir3::LEFT + Dir3::FORWARD,
+            0.5,
+            material_left,
+        ));
+        world.push(Sphere::new(
+            Point3::ORIGIN + Dir3::RIGHT + Dir3::FORWARD,
+            0.5,
+            material_right,
+        ));
         world
     };
 

@@ -98,10 +98,20 @@ impl Dir3 {
     }
 
     pub fn near_zero(self) -> bool {
-        let eps : f32 = 1e-8;
+        let eps: f32 = 1e-8;
         self.x.abs() < eps && self.y.abs() < eps && self.z.abs() < eps
     }
-    pub fn near_zero_or_else(self, default: Dir3) -> Dir3 { if self.near_zero() {default} else {self} }
+    pub fn near_zero_or_else(self, default: Dir3) -> Dir3 {
+        if self.near_zero() {
+            default
+        } else {
+            self
+        }
+    }
+
+    pub fn reflect(direction: Dir3, normal: Dir3) -> Dir3 {
+        direction - (2.0 * Self::dot(direction, normal)) * normal
+    }
 }
 
 impl std::ops::Sub<Point3> for Point3 {

@@ -29,7 +29,7 @@ impl Color {
         Self::new_rgb(self.r.sqrt(), self.g.sqrt(), self.b.sqrt())
     }
 
-    pub fn convolution(a : Self, b : Self) -> Self {
+    pub fn convolution(a: Self, b: Self) -> Self {
         Self::new_rgb(a.r * b.r, a.g * b.g, a.b * b.b)
     }
 }
