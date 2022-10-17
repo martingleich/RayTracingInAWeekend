@@ -12,7 +12,8 @@
                 "args": [
                     "build",
                     "--bin=ray_tracing_in_a_weekend",
-                    "--package=ray_tracing_in_a_weekend"
+                    "--package=ray_tracing_in_a_weekend",
+                    "--release"
                 ],
                 "filter": {
                     "name": "ray_tracing_in_a_weekend",

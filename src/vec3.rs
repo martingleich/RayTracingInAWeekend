@@ -13,11 +13,13 @@ pub struct Dir3 {
 }
 
 impl Point3 {
-    pub fn new(x: f32, y: f32, z: f32) -> Point3 {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
         Point3 { x, y, z }
     }
-
-    pub const ORIGIN: Point3 = Point3 {
+    pub fn new_from_arr(c: [f32; 3]) -> Self {
+        Self::new(c[0], c[1], c[2])
+    }
+    pub const ORIGIN: Self = Self {
         x: 0.0,
         y: 0.0,
         z: 0.0,
@@ -25,41 +27,44 @@ impl Point3 {
 }
 
 impl Dir3 {
-    pub fn new(x: f32, y: f32, z: f32) -> Dir3 {
-        Dir3 { x, y, z }
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+    pub fn new_from_arr(c: [f32; 3]) -> Self {
+        Self::new(c[0], c[1], c[2])
     }
 
-    pub const ZERO: Dir3 = Dir3 {
+    pub const ZERO: Self = Self {
         x: 0.0,
         y: 0.0,
         z: 0.0,
     };
-    pub const RIGHT: Dir3 = Dir3 {
+    pub const RIGHT: Self = Self {
         x: 1.0,
         y: 0.0,
         z: 0.0,
     };
-    pub const LEFT: Dir3 = Dir3 {
+    pub const LEFT: Self = Self {
         x: -1.0,
         y: 0.0,
         z: 0.0,
     };
-    pub const UP: Dir3 = Dir3 {
+    pub const UP: Self = Self {
         x: 0.0,
         y: 1.0,
         z: 0.0,
     };
-    pub const DOWN: Dir3 = Dir3 {
+    pub const DOWN: Self = Self {
         x: 0.0,
         y: -1.0,
         z: 0.0,
     };
-    pub const FORWARD: Dir3 = Dir3 {
+    pub const FORWARD: Self = Self {
         x: 0.0,
         y: 0.0,
         z: -1.0,
     };
-    pub const BACKWARD: Dir3 = Dir3 {
+    pub const BACKWARD: Self = Self {
         x: 0.0,
         y: 0.0,
         z: 1.0,
@@ -73,22 +78,22 @@ impl Dir3 {
         Self::dot(self, self)
     }
 
-    pub fn dot(a: Dir3, b: Dir3) -> f32 {
+    pub fn dot(a: Self, b: Self) -> f32 {
         a.x * b.x + a.y * b.y + a.z * b.z
     }
 
-    pub fn cross(a: Dir3, b: Dir3) -> Dir3 {
-        Dir3 {
+    pub fn cross(a: Self, b: Self) -> Self {
+        Self {
             x: a.y * b.z - a.z * b.y,
             y: a.z * b.x - a.x * b.z,
             z: a.x * b.y - a.y * b.x,
         }
     }
 
-    pub fn unit(self) -> Dir3 {
+    pub fn unit(self) -> Self {
         self.with_length(1.0)
     }
-    pub fn with_length(self, length: f32) -> Dir3 {
+    pub fn with_length(self, length: f32) -> Self {
         self * (length / self.length())
     }
 }
