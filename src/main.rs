@@ -12,13 +12,18 @@ use std::{
     fs::{File, OpenOptions},
     io::Write,
     path::Path,
+    thread::{self, Scope},
 };
 
 use camera::Camera;
 use color::Color;
 use hittable::{HitInteraction, Hittable, HittableList, Sphere};
 
-use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
+use rand::{
+    distributions::Uniform,
+    rngs::{StdRng},
+    Rng, SeedableRng,
+};
 use rand_distr::{Distribution, UnitBall, UnitSphere};
 use ray::Ray;
 use size2i::Size2i;
@@ -95,8 +100,9 @@ impl Material {
 fn main() -> Result<(), std::io::Error> {
     let path = Path::new("output/image.ppm");
     let image_size = Size2i::new(400, 225);
-    let samples_per_pixel = 500;
+    let samples_per_pixel = 100;
     let max_depth = 50;
+    let thread_count = thread::available_parallelism().map_or(4, |x| x.get());
 
     let viewport_width = 1.2;
     let viewport_height = image_size.aspect_ratio() * viewport_width;
@@ -104,7 +110,7 @@ fn main() -> Result<(), std::io::Error> {
         viewport_width,
         viewport_height,
         1.0,
-        Point3::ORIGIN  + Dir3::BACKWARD * 3.0,
+        Point3::ORIGIN + Dir3::BACKWARD * 3.0,
         Dir3::UP,
         Dir3::FORWARD,
     );
@@ -155,39 +161,70 @@ fn main() -> Result<(), std::io::Error> {
             y: 1.0 / (image_size.height - 1) as f32,
         },
     );
-    let mut rng = rand::thread_rng();
+    let planes = thread::scope(|s| {
+        thread_scope(
+            s,
+            thread_count,
+            rand::rngs::StdRng::from_entropy(),
+            image_size,
+            samples_per_pixel,
+            &camera,
+            &world,
+            max_depth,
+            &distr,
+        )
+    });
 
-    let color_at_viewport = |pixel: Vec2f, rng: &mut ThreadRng| -> Color {
-        ray_color(&camera.ray(pixel), &world, rng, max_depth)
-    };
-    let pixels_iter = image_size
-        .iterf()
-        .map(|f| {
-            (0..samples_per_pixel)
-                .map(|_| color_at_viewport(f + rng.sample(&distr), &mut rng))
-                .sum::<Color>()
-        })
-        .map(|c| c / samples_per_pixel as f32)
-        .map(|c| c.gamma2());
-    let pixels = collect_with_progress(pixels_iter, image_size.count());
-
+    let pixels = merge_planes(image_size, planes, thread_count);
     let out = OpenOptions::new().write(true).create(true).open(path)?;
-    write_ppm_image(out, pixels, image_size)
+    write_ppm_image(out, pixels, image_size)?;
+    Ok(())
 }
 
-fn collect_with_progress<I: IntoIterator>(iter: I, count: i32) -> Vec<I::Item> {
-    let one_percent = (count / 100) as usize;
-    let mut result = Vec::new();
-    result.reserve(count as usize);
-    for x in iter {
-        result.push(x);
-        if result.len() % one_percent == 0 {
-            let percent = result.len() as f32 / one_percent as f32;
-            eprintln!("{percent} %");
+fn merge_planes(image_size: Size2i, result: Vec<Vec<Color>>, thread_count: usize) -> Vec<Color> {
+    let mut pixels: Vec<Color> = vec![Color::BLACK; image_size.count() as usize];
+    for plane in result {
+        for (p, i) in plane.iter().enumerate() {
+            pixels[p] += *i;
         }
     }
-    eprintln!("Done!!!");
-    result
+    for pix in &mut pixels {
+        *pix = *pix / (thread_count as f32);
+    }
+    pixels
+}
+
+fn thread_scope<'scope, 'env>(
+    s: &'scope Scope<'scope, 'env>,
+    thread_count: usize,
+    mut rng: StdRng,
+    image_size: Size2i,
+    samples_per_pixel: i32,
+    camera: &'env Camera,
+    world: &'env HittableList,
+    max_depth: i32,
+    distr: &'env Uniform<Vec2f>,
+) -> Vec<Vec<Color>> {
+    let real_sample_per_pixel = samples_per_pixel / thread_count as i32;
+    (0..thread_count)
+        .map(|_| {
+            let mut sub_rng: rand_xoshiro::Xoroshiro128PlusPlus =
+                rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
+            let per_pixel = move |fpix: Vec2f| {
+                (0..real_sample_per_pixel)
+                    .map(|_| {
+                        let pix = fpix + sub_rng.sample(distr);
+                        let ray = camera.ray(pix);
+                        ray_color(&ray, world, &mut sub_rng, max_depth)
+                    })
+                    .sum::<Color>()
+                    / real_sample_per_pixel as f32
+            };
+
+            s.spawn(move || image_size.iterf().map(per_pixel).collect::<Vec<_>>())
+        })
+        .map(|t| t.join().unwrap())
+        .collect::<Vec<_>>()
 }
 
 fn write_ppm_image<I: IntoIterator<Item = Color>>(
