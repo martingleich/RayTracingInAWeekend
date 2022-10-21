@@ -26,6 +26,14 @@ use size2i::Size2i;
 use vec2::Vec2f;
 use vec3::{Dir3, Point3};
 
+
+fn sky_color(ray: &Ray) -> Color {
+    let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
+    let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
+    let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
+    math::lerp(sky_color, ground_color, t)
+}
+
 fn ray_color<THit: Hittable, TRng: rand::Rng>(
     ray: &Ray,
     world: &THit,
@@ -45,12 +53,7 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
             Color::BLACK
         }
     } else {
-        // Sky
-        let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
-        let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
-        let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
-
-        math::lerp(sky_color, ground_color, t)
+        sky_color(ray)
     }
 }
 
@@ -162,7 +165,7 @@ fn render(
             Err(_) => {
                 eprintln!("\rRendering done");
                 return;
-            },
+            }
         };
     });
 
@@ -174,24 +177,20 @@ fn render(
         let remaining_samples_per_pixel = samples_per_pixel % thread_count;
         (0..thread_count)
             .map(|thread_id| {
-                let real_sample_per_pixel = whole_sample_per_pixel
-                    + if thread_id < remaining_samples_per_pixel {
-                        1
-                    } else {
-                        0
-                    };
+                let real_samples_per_pixel =
+                    whole_sample_per_pixel + (thread_id < remaining_samples_per_pixel) as usize;
                 let local_tx = tx.clone();
 
                 let mut sub_rng = rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
                 let per_pixel = move |fpix: Vec2f| {
-                    (0..real_sample_per_pixel)
+                    (0..real_samples_per_pixel)
                         .map(|_| {
                             let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
                             let ray = camera.ray(pix);
                             ray_color(&ray, world, &mut sub_rng, max_depth)
                         })
                         .sum::<Color>()
-                        / real_sample_per_pixel as f32
+                        / real_samples_per_pixel as f32
                 };
 
                 let mut count = 0;
@@ -199,7 +198,7 @@ fn render(
                     if count % one_work_step == 0 {
                         local_tx.send((thread_id, count)).unwrap();
                     }
-                    count += real_sample_per_pixel;
+                    count += real_samples_per_pixel;
                     fpix
                 };
 
@@ -222,9 +221,9 @@ fn render(
     merge_planes(image_size, planes, thread_count)
 }
 
-fn merge_planes(image_size: Size2i, result: Vec<Vec<Color>>, thread_count: usize) -> Vec<Color> {
+fn merge_planes(image_size: Size2i, planes: Vec<Vec<Color>>, thread_count: usize) -> Vec<Color> {
     let mut pixels: Vec<Color> = vec![Color::BLACK; image_size.count()];
-    for plane in result {
+    for plane in planes {
         for (p, i) in plane.iter().enumerate() {
             pixels[p] += *i;
         }
