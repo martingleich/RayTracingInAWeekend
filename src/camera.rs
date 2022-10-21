@@ -12,6 +12,23 @@ pub struct Camera {
 }
 
 impl Camera {
+    pub fn new_look_at(
+        viewport_width: f32,
+        viewport_height: f32,
+        focal_length: f32,
+        position: Point3,
+        up: Dir3,
+        look_at: Point3,
+    ) -> Camera {
+        Self::new(
+            viewport_width,
+            viewport_height,
+            focal_length,
+            position,
+            up,
+            look_at - position,
+        )
+    }
     pub fn new(
         viewport_width: f32,
         viewport_height: f32,
@@ -21,7 +38,7 @@ impl Camera {
         forward: Dir3,
     ) -> Camera {
         let sright = Dir3::cross(forward, up).with_length(viewport_width);
-        let sup = up.with_length(viewport_height);
+        let sup = Dir3::cross(sright, forward).with_length(viewport_height);
         let sforward = forward.with_length(focal_length);
 
         Self {

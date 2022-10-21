@@ -68,13 +68,14 @@ fn main() -> Result<(), ImageError> {
 
     let viewport_width = 1.2;
     let viewport_height = image_size.aspect_ratio() * viewport_width;
-    let camera = Camera::new(
+
+    let camera = Camera::new_look_at(
         viewport_width,
         viewport_height,
         1.0,
-        Point3::ORIGIN + Dir3::BACKWARD * 3.0,
+        Point3::ORIGIN + Dir3::BACKWARD * 3.0 + Dir3::UP * 3.0 + Dir3::RIGHT,
         Dir3::UP,
-        Dir3::FORWARD,
+        Point3::ORIGIN,
     );
 
     let world = {
@@ -117,7 +118,7 @@ fn main() -> Result<(), ImageError> {
             material_right,
         ));
         world.push(Sphere::new(
-            Point3::ORIGIN + 0.5 * Dir3::LEFT + 0.2 * Dir3::DOWN,
+            Point3::ORIGIN + 0.5 * Dir3::LEFT + 0.3 * Dir3::UP,
             0.3,
             material_front,
         ));
