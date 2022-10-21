@@ -110,6 +110,7 @@ fn main() -> Result<(), ImageError> {
         ));
         world
     };
+
     let pixels = render(
         image_size,
         thread_count,
@@ -118,6 +119,7 @@ fn main() -> Result<(), ImageError> {
         &camera,
         &world,
     );
+    eprintln!("Saving image...");
     let bytes = pixels.iter().flat_map(|c| c.to_rgb8()).collect::<Vec<_>>();
     image::save_buffer(
         path,
@@ -136,6 +138,7 @@ fn render(
     camera: &Camera,
     world: &HittableList,
 ) -> Vec<Color> {
+    eprintln!("Start rendering...");
     let pixel_sample_distr = Uniform::new(
         Vec2f { x: 0.0, y: 0.0 },
         Vec2f {
@@ -167,6 +170,7 @@ fn render(
             .collect::<Vec<_>>()
     });
 
+    eprintln!("Merging threads...");
     merge_planes(image_size, planes, thread_count)
 }
 
