@@ -22,8 +22,7 @@ impl Material {
         match self {
             Material::Lambert { albedo } => {
                 let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng)))
-                    .near_zero_or_else(interaction.normal)
-                    .unit();
+                    .unit_or_else(interaction.normal);
                 let scattered = Ray::new(interaction.position, direction);
                 Some((*albedo, scattered))
             }

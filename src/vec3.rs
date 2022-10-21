@@ -184,6 +184,14 @@ impl Dir3 {
             self
         }
     }
+    pub fn unit_or_else(self, default: Dir3) -> Dir3 {
+        let len_sq = self.length_squared();
+        if len_sq <= 1e-8{
+            self / len_sq.sqrt()
+        } else {
+            default
+        }
+    }
 
     pub fn reflect(direction: Dir3, normal: Dir3) -> Dir3 {
         direction - (2.0 * Self::dot(direction, normal)) * normal
