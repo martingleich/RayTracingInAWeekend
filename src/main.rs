@@ -14,7 +14,7 @@ use camera::Camera;
 use color::Color;
 use hittable::{Hittable, HittableList, Sphere};
 
-use image::ImageError;
+use image::{ImageError};
 use material::Material;
 use rand::{distributions::Uniform, Rng, SeedableRng};
 use ray::Ray;
@@ -151,27 +151,32 @@ fn render(
             y: 1.0 / (image_size.height - 1) as f32,
         },
     );
-    let (tx, rx) = mpsc::channel::<(usize, usize)>();
 
+    let (tx, rx) = mpsc::channel::<(usize, usize)>();
     let total_work = samples_per_pixel * image_size.count();
     let mut done_work = vec![0; thread_count];
     let mut last_output = usize::MAX;
-    let report_update_thread = thread::spawn(move || loop {
-        match rx.recv() {
-            Ok((id, done)) => {
-                done_work[id] = done;
-                let total_done = done_work.iter().sum::<usize>();
-                let done_percent = (100 * total_done) / total_work;
-                if last_output != done_percent {
-                    last_output = done_percent;
-                    eprint!("\r{done_percent} %");
+    let report_update_thread = thread::spawn(move ||{
+        let start_time = std::time::Instant::now();
+        loop {
+            match rx.recv() {
+                Ok((id, done)) => {
+                    done_work[id] = done;
+                    let total_done = done_work.iter().sum::<usize>();
+                    let done_percent = (100 * total_done) / total_work;
+                    if last_output != done_percent {
+                        last_output = done_percent;
+                        eprint!("\r{done_percent} %");
+                    }
                 }
-            }
-            Err(_) => {
-                eprintln!("\rRendering done");
-                return;
-            }
-        };
+                Err(_) => {
+                    let passed_time = std::time::Instant::now() - start_time;
+                    let passed_time_seconds = passed_time.as_secs_f64();
+                    eprintln!("\rRendering done in {passed_time_seconds} seconds");
+                    return;
+                }
+            };
+        }
     });
 
     let one_work_step = total_work / (thread_count * 100);
@@ -228,18 +233,19 @@ fn render(
             .map(|t| t.join().unwrap())
             .collect::<Vec<_>>()
     });
-    drop(tx); // Drop the final sender
+    drop(tx); // Drop the final sender, so the report_update_thread stops
 
     report_update_thread.join().unwrap();
 
     eprintln!("Merging threads...");
-    merge_planes(image_size, planes)
+    merge_planes(planes)
 }
 
-fn merge_planes(image_size: Size2i, planes: Vec<Vec<Color>>) -> Vec<Color> {
+fn merge_planes(mut planes: Vec<Vec<Color>>) -> Vec<Color> {
     let multiplier = 1.0 / planes.len() as f32;
-    let mut pixels: Vec<Color> = vec![Color::BLACK; image_size.count()];
-    for plane in planes {
+    let mut pixels = planes.pop().unwrap();
+    for plane in &planes {
+        debug_assert_eq!(pixels.len(), plane.len());
         for (p, i) in plane.iter().enumerate() {
             pixels[p] += *i;
         }
