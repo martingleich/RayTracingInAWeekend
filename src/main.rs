@@ -14,7 +14,7 @@ use camera::Camera;
 use color::Color;
 use hittable::{Hittable, HittableList, Sphere};
 
-use image::{ImageError};
+use image::ImageError;
 use material::Material;
 use rand::{distributions::Uniform, Rng, SeedableRng};
 use ray::Ray;
@@ -156,7 +156,7 @@ fn render(
     let total_work = samples_per_pixel * image_size.count();
     let mut done_work = vec![0; thread_count];
     let mut last_output = usize::MAX;
-    let report_update_thread = thread::spawn(move ||{
+    let report_update_thread = thread::spawn(move || {
         let start_time = std::time::Instant::now();
         loop {
             match rx.recv() {
@@ -183,48 +183,48 @@ fn render(
     let pixel_sample_distr_ref = &pixel_sample_distr;
     let mut rng = rand::rngs::StdRng::from_entropy();
     let planes = thread::scope(|s| {
-        let whole_sample_per_pixel = samples_per_pixel / thread_count;
-        let remaining_samples_per_pixel = samples_per_pixel % thread_count;
+        let work_tasks = split_work_tasks(samples_per_pixel, thread_count);
 
         #[allow(clippy::needless_collect)]
         // reason:"First start all threads, the collect them. Removing the collect would serialize the threads")]
-        let threads = (0..thread_count)
-            .filter_map(|thread_id| {
-                let real_samples_per_pixel =
-                    whole_sample_per_pixel + (thread_id < remaining_samples_per_pixel) as usize;
-                if real_samples_per_pixel == 0 {
-                    return None;
-                }
-                let local_tx = tx.clone();
-
-                let mut sub_rng = rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
-                let per_pixel = move |fpix: Vec2f| {
-                    (0..real_samples_per_pixel)
-                        .map(|_| {
-                            let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
-                            let ray = camera.ray(pix);
-                            ray_color(&ray, world, &mut sub_rng, max_depth)
-                        })
-                        .sum::<Color>()
-                        / real_samples_per_pixel as f32
-                };
-
-                let mut count = 0;
-                let update = move |fpix: Color| {
-                    if count % one_work_step == 0 {
-                        local_tx.send((thread_id, count)).unwrap();
+        let threads = work_tasks
+            .into_iter()
+            .map(|(thread_id, real_samples_per_pixel)| {
+                let render_pixel = {
+                    let mut sub_rng =
+                        rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
+                    move |fpix: Vec2f| {
+                        (0..real_samples_per_pixel)
+                            .map(|_| {
+                                let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
+                                let ray = camera.ray(pix);
+                                ray_color(&ray, world, &mut sub_rng, max_depth)
+                            })
+                            .sum::<Color>()
+                            / real_samples_per_pixel as f32
                     }
-                    count += real_samples_per_pixel;
-                    fpix
                 };
 
-                Some(s.spawn(move || {
+                let update_progress = {
+                    let local_tx = tx.clone();
+                    let mut count = 0;
+                    move |fpix: Color| {
+                        if count % one_work_step == 0 {
+                            local_tx.send((thread_id, count)).unwrap();
+                        }
+                        count += real_samples_per_pixel;
+                        fpix
+                    }
+                };
+
+                let thread = move || {
                     image_size
                         .iterf()
-                        .map(per_pixel)
-                        .map(update) // Sideeffect
+                        .map(render_pixel)
+                        .map(update_progress) // Sideeffect
                         .collect::<Vec<_>>()
-                }))
+                };
+                s.spawn(thread)
             })
             .collect::<Vec<_>>();
 
@@ -239,6 +239,26 @@ fn render(
 
     eprintln!("Merging threads...");
     merge_planes(planes)
+}
+
+fn split_work_tasks(samples_per_pixel: usize, thread_count: usize) -> Vec<(usize, usize)> {
+    let work_tasks = {
+        let whole_sample_per_pixel = samples_per_pixel / thread_count;
+        let remaining_samples_per_pixel = samples_per_pixel % thread_count;
+        let mut work_tasks = Vec::new();
+        let mut id = 0;
+        while id < thread_count {
+            let real_samples_per_pixel =
+                whole_sample_per_pixel + (id < remaining_samples_per_pixel) as usize;
+            if real_samples_per_pixel == 0 {
+                break;
+            }
+            work_tasks.push((id, real_samples_per_pixel));
+            id = id + 1;
+        }
+        work_tasks
+    };
+    work_tasks
 }
 
 fn merge_planes(mut planes: Vec<Vec<Color>>) -> Vec<Color> {
