@@ -4,7 +4,7 @@ use rand::distributions::Uniform;
 use rand::prelude::Distribution;
 use rand::Rng;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, derive_more::Add)]
 pub struct Vec2<T> {
     pub x: T,
     pub y: T,
@@ -60,15 +60,4 @@ impl UniformSampler for UniformVec2<f32> {
 
 impl SampleUniform for Vec2f {
     type Sampler = UniformVec2<f32>;
-}
-
-impl<T: std::ops::Add<T, Output = T>> std::ops::Add<Vec2<T>> for Vec2<T> {
-    type Output = Vec2<T>;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::Output {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-        }
-    }
 }
