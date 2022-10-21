@@ -22,8 +22,8 @@ impl Size2i {
             sy: 1.0 / ((self.height - 1) as f32),
         }
     }
-    pub fn count(self) -> i32 {
-        self.width * self.height
+    pub fn count(self) -> usize {
+        self.width as usize * self.height as usize
     }
 }
 

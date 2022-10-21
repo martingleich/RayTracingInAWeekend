@@ -10,6 +10,7 @@ mod vec3;
 
 use std::{
     path::Path,
+    sync::mpsc,
     thread::{self},
 };
 
@@ -55,7 +56,7 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
 
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
-    let image_size = Size2i::new(400, 225);
+    let image_size = Size2i::new(800, 450);
     let samples_per_pixel = 100;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(4, |x| x.get());
@@ -133,7 +134,7 @@ fn main() -> Result<(), ImageError> {
 fn render(
     image_size: Size2i,
     thread_count: usize,
-    samples_per_pixel: i32,
+    samples_per_pixel: usize,
     max_depth: i32,
     camera: &Camera,
     world: &HittableList,
@@ -146,12 +147,41 @@ fn render(
             y: 1.0 / (image_size.height - 1) as f32,
         },
     );
+    let (tx, rx) = mpsc::channel::<(usize, usize)>();
+
+    let total_work = samples_per_pixel * image_size.count();
+    let mut done_work = vec![0; thread_count];
+    let report_update_thread = thread::spawn(move || loop {
+        match rx.recv() {
+            Ok((id, done)) => {
+                done_work[id] = done;
+                let total_done = done_work.iter().sum::<usize>();
+                let done_percent = (100 * total_done) / total_work;
+                eprint!("\r{done_percent} %");
+            }
+            Err(_) => {
+                eprintln!("\rRendering done");
+                return;
+            },
+        };
+    });
+
+    let one_work_step = total_work / (thread_count * 100);
     let pixel_sample_distr_ref = &pixel_sample_distr;
     let mut rng = rand::rngs::StdRng::from_entropy();
     let planes = thread::scope(|s| {
-        let real_sample_per_pixel = samples_per_pixel / thread_count as i32;
+        let whole_sample_per_pixel = samples_per_pixel / thread_count;
+        let remaining_samples_per_pixel = samples_per_pixel % thread_count;
         (0..thread_count)
-            .map(|_| {
+            .map(|thread_id| {
+                let real_sample_per_pixel = whole_sample_per_pixel
+                    + if thread_id < remaining_samples_per_pixel {
+                        1
+                    } else {
+                        0
+                    };
+                let local_tx = tx.clone();
+
                 let mut sub_rng = rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
                 let per_pixel = move |fpix: Vec2f| {
                     (0..real_sample_per_pixel)
@@ -164,18 +194,36 @@ fn render(
                         / real_sample_per_pixel as f32
                 };
 
-                s.spawn(move || image_size.iterf().map(per_pixel).collect::<Vec<_>>())
+                let mut count = 0;
+                let update = move |fpix: Color| {
+                    if count % one_work_step == 0 {
+                        local_tx.send((thread_id, count)).unwrap();
+                    }
+                    count += real_sample_per_pixel;
+                    fpix
+                };
+
+                s.spawn(move || {
+                    image_size
+                        .iterf()
+                        .map(per_pixel)
+                        .map(update) // Sideeffect
+                        .collect::<Vec<_>>()
+                })
             })
             .map(|t| t.join().unwrap())
             .collect::<Vec<_>>()
     });
+    drop(tx); // Drop the final sender
+
+    report_update_thread.join().unwrap();
 
     eprintln!("Merging threads...");
     merge_planes(image_size, planes, thread_count)
 }
 
 fn merge_planes(image_size: Size2i, result: Vec<Vec<Color>>, thread_count: usize) -> Vec<Color> {
-    let mut pixels: Vec<Color> = vec![Color::BLACK; image_size.count() as usize];
+    let mut pixels: Vec<Color> = vec![Color::BLACK; image_size.count()];
     for plane in result {
         for (p, i) in plane.iter().enumerate() {
             pixels[p] += *i;
