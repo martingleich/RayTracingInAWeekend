@@ -103,6 +103,7 @@ fn main() -> Result<(), std::io::Error> {
     let samples_per_pixel = 100;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(4, |x| x.get());
+    eprintln!("Using {thread_count} threads.");
 
     let viewport_width = 1.2;
     let viewport_height = image_size.aspect_ratio() * viewport_width;
@@ -153,7 +154,6 @@ fn main() -> Result<(), std::io::Error> {
         ));
         world
     };
-
     let distr = Uniform::new(
         Vec2f { x: 0.0, y: 0.0 },
         Vec2f {
@@ -168,11 +168,10 @@ fn main() -> Result<(), std::io::Error> {
             rand::rngs::StdRng::from_entropy(),
             image_size,
             samples_per_pixel,
+            max_depth,
             &camera,
             &world,
-            max_depth,
-            &distr,
-        )
+            &distr)
     });
 
     let pixels = merge_planes(image_size, planes, thread_count);
@@ -198,18 +197,19 @@ fn thread_scope<'scope, 'env>(
     s: &'scope Scope<'scope, 'env>,
     thread_count: usize,
     mut rng: StdRng,
+
     image_size: Size2i,
     samples_per_pixel: i32,
+    max_depth: i32,
+
     camera: &'env Camera,
     world: &'env HittableList,
-    max_depth: i32,
-    distr: &'env Uniform<Vec2f>,
+    distr: &'env Uniform<Vec2f>
 ) -> Vec<Vec<Color>> {
     let real_sample_per_pixel = samples_per_pixel / thread_count as i32;
     (0..thread_count)
         .map(|_| {
-            let mut sub_rng: rand_xoshiro::Xoroshiro128PlusPlus =
-                rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
+            let mut sub_rng = rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
             let per_pixel = move |fpix: Vec2f| {
                 (0..real_sample_per_pixel)
                     .map(|_| {
