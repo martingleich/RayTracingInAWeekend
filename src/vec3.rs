@@ -186,7 +186,7 @@ impl Dir3 {
     }
     pub fn unit_or_else(self, default: Dir3) -> Dir3 {
         let len_sq = self.length_squared();
-        if len_sq <= 1e-8{
+        if len_sq > 1e-8{
             self / len_sq.sqrt()
         } else {
             default
