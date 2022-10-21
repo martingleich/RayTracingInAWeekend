@@ -1,73 +1,122 @@
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Vec3<T> {
+    pub e: [T; 3],
+}
+
+impl<T> Vec3<T> {
+    pub fn new(e0: T, e1: T, e2: T) -> Self {
+        Self { e: [e0, e1, e2] }
+    }
+}
+
+impl<T: std::ops::Sub<T, Output = T> + Copy> std::ops::Sub<Vec3<T>> for Vec3<T> {
+    type Output = Vec3<T>;
+
+    fn sub(self, rhs: Vec3<T>) -> Self::Output {
+        Self::new(
+            self.e[0] - rhs.e[0],
+            self.e[1] - rhs.e[1],
+            self.e[2] - rhs.e[2],
+        )
+    }
+}
+
+impl<T: std::ops::Add<T, Output = T> + Copy> std::ops::Add<Vec3<T>> for Vec3<T> {
+    type Output = Vec3<T>;
+
+    fn add(self, rhs: Vec3<T>) -> Self::Output {
+        Self::new(
+            self.e[0] + rhs.e[0],
+            self.e[1] + rhs.e[1],
+            self.e[2] + rhs.e[2],
+        )
+    }
+}
+
+impl<T: std::ops::Neg<Output = T> + Copy> std::ops::Neg for Vec3<T> {
+    type Output = Vec3<T>;
+
+    fn neg(self) -> Self::Output {
+        Self::new(-self.e[0], -self.e[1], -self.e[2])
+    }
+}
+
+impl<T: std::ops::Mul<f32, Output = T> + Copy> std::ops::Mul<f32> for Vec3<T> {
+    type Output = Vec3<T>;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self::new(self.e[0] * rhs, self.e[1] * rhs, self.e[2] * rhs)
+    }
+}
+
+impl<T: std::ops::Div<f32, Output = T> + Copy> std::ops::Div<f32> for Vec3<T> {
+    type Output = Vec3<T>;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        Self::new(self.e[0] / rhs, self.e[1] / rhs, self.e[2] / rhs)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Point3 {
-    x: f32,
-    y: f32,
-    z: f32,
+    v: Vec3<f32>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Dir3 {
-    x: f32,
-    y: f32,
-    z: f32,
+    v: Vec3<f32>,
 }
 
 impl Point3 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
-        Point3 { x, y, z }
+        Self {
+            v: Vec3 { e: [x, y, z] },
+        }
     }
     pub fn new_from_arr(c: [f32; 3]) -> Self {
         Self::new(c[0], c[1], c[2])
     }
     pub const ORIGIN: Self = Self {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
+        v: Vec3 { e: [0.0, 0.0, 0.0] },
     };
 }
 
 impl Dir3 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
-        Self { x, y, z }
+        Self {
+            v: Vec3 { e: [x, y, z] },
+        }
     }
     pub fn new_from_arr(c: [f32; 3]) -> Self {
         Self::new(c[0], c[1], c[2])
     }
 
     pub const ZERO: Self = Self {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
+        v: Vec3 { e: [0.0, 0.0, 0.0] },
     };
     pub const RIGHT: Self = Self {
-        x: 1.0,
-        y: 0.0,
-        z: 0.0,
+        v: Vec3 { e: [1.0, 0.0, 0.0] },
     };
     pub const LEFT: Self = Self {
-        x: -1.0,
-        y: 0.0,
-        z: 0.0,
+        v: Vec3 {
+            e: [-1.0, 0.0, 0.0],
+        },
     };
     pub const UP: Self = Self {
-        x: 0.0,
-        y: 1.0,
-        z: 0.0,
+        v: Vec3 { e: [0.0, 1.0, 0.0] },
     };
     pub const DOWN: Self = Self {
-        x: 0.0,
-        y: -1.0,
-        z: 0.0,
+        v: Vec3 {
+            e: [0.0, -1.0, 0.0],
+        },
     };
     pub const FORWARD: Self = Self {
-        x: 0.0,
-        y: 0.0,
-        z: -1.0,
+        v: Vec3 {
+            e: [0.0, 0.0, -1.0],
+        },
     };
     pub const BACKWARD: Self = Self {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0,
+        v: Vec3 { e: [0.0, 0.0, 1.0] },
     };
 
     pub fn length(self) -> f32 {
@@ -79,14 +128,18 @@ impl Dir3 {
     }
 
     pub fn dot(a: Self, b: Self) -> f32 {
-        a.x * b.x + a.y * b.y + a.z * b.z
+        a.v.e[0] * b.v.e[0] + a.v.e[1] * b.v.e[1] + a.v.e[2] * b.v.e[2]
     }
 
     pub fn cross(a: Self, b: Self) -> Self {
         Self {
-            x: a.y * b.z - a.z * b.y,
-            y: a.z * b.x - a.x * b.z,
-            z: a.x * b.y - a.y * b.x,
+            v: Vec3 {
+                e: [
+                    a.v.e[1] * b.v.e[2] - a.v.e[2] * b.v.e[1],
+                    a.v.e[2] * b.v.e[0] - a.v.e[0] * b.v.e[2],
+                    a.v.e[0] * b.v.e[1] - a.v.e[1] * b.v.e[0],
+                ],
+            },
         }
     }
 
@@ -99,7 +152,7 @@ impl Dir3 {
 
     pub fn near_zero(self) -> bool {
         let eps: f32 = 1e-8;
-        self.x.abs() < eps && self.y.abs() < eps && self.z.abs() < eps
+        self.v.e[0].abs() < eps && self.v.e[1].abs() < eps && self.v.e[2].abs() < eps
     }
     pub fn near_zero_or_else(self, default: Dir3) -> Dir3 {
         if self.near_zero() {
@@ -114,35 +167,32 @@ impl Dir3 {
     }
 }
 
+// Point
+
 impl std::ops::Sub<Point3> for Point3 {
     type Output = Dir3;
-
     fn sub(self, rhs: Point3) -> Self::Output {
-        Dir3::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
+        Self::Output { v: self.v - rhs.v }
     }
 }
 
 impl std::ops::Sub<Dir3> for Point3 {
     type Output = Point3;
-
     fn sub(self, rhs: Dir3) -> Self::Output {
-        Point3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+        Self::Output { v: self.v + rhs.v }
     }
 }
 
 impl std::ops::Add<Dir3> for Point3 {
     type Output = Point3;
-
     fn add(self, rhs: Dir3) -> Self::Output {
-        Point3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+        Self::Output { v: self.v + rhs.v }
     }
 }
 
 impl std::ops::AddAssign<Dir3> for Point3 {
     fn add_assign(&mut self, rhs: Dir3) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-        self.z += rhs.z;
+        *self = *self + rhs;
     }
 }
 
@@ -150,19 +200,13 @@ impl std::ops::Mul<f32> for Point3 {
     type Output = Point3;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        Point3 {
-            x: self.x * rhs,
-            y: self.y * rhs,
-            z: self.z * rhs,
-        }
+        Self::Output { v: self.v * rhs }
     }
 }
 
 impl std::ops::MulAssign<f32> for Point3 {
     fn mul_assign(&mut self, rhs: f32) {
-        self.x *= rhs;
-        self.y *= rhs;
-        self.z *= rhs;
+        *self = *self * rhs;
     }
 }
 
@@ -176,29 +220,24 @@ impl std::ops::Mul<Point3> for f32 {
 
 impl std::ops::Div<f32> for Point3 {
     type Output = Point3;
-
     fn div(self, rhs: f32) -> Self::Output {
-        self * (1.0 / rhs)
+        Self::Output { v: self.v / rhs }
     }
 }
+
+// Dir
 
 impl std::ops::Add<Dir3> for Dir3 {
     type Output = Dir3;
 
     fn add(self, rhs: Dir3) -> Self::Output {
-        Dir3 {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-            z: self.z + rhs.z,
-        }
+        Self::Output { v: self.v + rhs.v }
     }
 }
 
 impl std::ops::AddAssign<Dir3> for Dir3 {
     fn add_assign(&mut self, rhs: Dir3) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-        self.z += rhs.z;
+        *self = *self + rhs;
     }
 }
 
@@ -206,19 +245,13 @@ impl std::ops::Sub<Dir3> for Dir3 {
     type Output = Dir3;
 
     fn sub(self, rhs: Dir3) -> Self::Output {
-        Dir3 {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-            z: self.z - rhs.z,
-        }
+        Self::Output { v: self.v - rhs.v }
     }
 }
 
 impl std::ops::SubAssign<Dir3> for Dir3 {
     fn sub_assign(&mut self, rhs: Dir3) {
-        self.x -= rhs.x;
-        self.y -= rhs.y;
-        self.z -= rhs.z;
+        *self = *self - rhs;
     }
 }
 
@@ -226,19 +259,13 @@ impl std::ops::Mul<f32> for Dir3 {
     type Output = Dir3;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        Dir3 {
-            x: self.x * rhs,
-            y: self.y * rhs,
-            z: self.z * rhs,
-        }
+        Self::Output { v: self.v * rhs }
     }
 }
 
 impl std::ops::MulAssign<f32> for Dir3 {
     fn mul_assign(&mut self, rhs: f32) {
-        self.x *= rhs;
-        self.y *= rhs;
-        self.z *= rhs;
+        *self = *self * rhs;
     }
 }
 
@@ -252,9 +279,8 @@ impl std::ops::Mul<Dir3> for f32 {
 
 impl std::ops::Div<f32> for Dir3 {
     type Output = Dir3;
-
     fn div(self, rhs: f32) -> Self::Output {
-        self * (1.0 / rhs)
+        Self::Output { v: self.v / rhs }
     }
 }
 
@@ -262,10 +288,6 @@ impl std::ops::Neg for Dir3 {
     type Output = Dir3;
 
     fn neg(self) -> Self::Output {
-        Dir3 {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-        }
+        Self::Output { v: -self.v }
     }
 }

@@ -26,7 +26,6 @@ use size2i::Size2i;
 use vec2::Vec2f;
 use vec3::{Dir3, Point3};
 
-
 fn sky_color(ray: &Ray) -> Color {
     let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
     let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
@@ -38,10 +37,10 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
     ray: &Ray,
     world: &THit,
     rng: &mut TRng,
-    max_depth : i32
+    max_depth: i32,
 ) -> Color {
     let mut depth = max_depth;
-    let mut attentuation : Color = Color::WHITE;
+    let mut attentuation: Color = Color::WHITE;
     let mut cur_ray = ray.clone();
     loop {
         if let Some(interaction) = world.hit(&cur_ray, &(0.0001..f32::INFINITY)) {
