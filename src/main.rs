@@ -144,6 +144,8 @@ fn render(
     world: &HittableList,
 ) -> Vec<Color> {
     eprintln!("Start rendering...");
+    let start_time = std::time::Instant::now();
+
     let pixel_sample_distr = Uniform::new(
         Vec2f { x: 0.0, y: 0.0 },
         Vec2f {
@@ -156,30 +158,21 @@ fn render(
     let total_work = samples_per_pixel * image_size.count();
     let mut done_work = vec![0; thread_count];
     let mut last_output = usize::MAX;
-    let report_update_thread = thread::spawn(move || {
-        let start_time = std::time::Instant::now();
-        loop {
-            match rx.recv() {
-                Ok((id, done)) => {
-                    done_work[id] = done;
-                    let total_done = done_work.iter().sum::<usize>();
-                    let done_percent = (100 * total_done) / total_work;
-                    if last_output != done_percent {
-                        last_output = done_percent;
-                        eprint!("\r{done_percent} %");
-                    }
+    let report_update_thread = thread::spawn(move || loop {
+        match rx.recv() {
+            Ok((id, done)) => {
+                done_work[id] = done;
+                let total_done = done_work.iter().sum::<usize>();
+                let done_percent = (100 * total_done) / total_work;
+                if last_output != done_percent {
+                    last_output = done_percent;
+                    eprint!("\r{done_percent} %");
                 }
-                Err(_) => {
-                    let passed_time = std::time::Instant::now() - start_time;
-                    let passed_time_seconds = passed_time.as_secs_f64();
-                    eprintln!("\rRendering done in {passed_time_seconds} seconds");
-                    return;
-                }
-            };
-        }
+            }
+            Err(_) => return,
+        };
     });
 
-    let one_work_step = total_work / (thread_count * 100);
     let pixel_sample_distr_ref = &pixel_sample_distr;
     let mut rng = rand::rngs::StdRng::from_entropy();
     let planes = thread::scope(|s| {
@@ -209,7 +202,7 @@ fn render(
                     let local_tx = tx.clone();
                     let mut count = 0;
                     move |fpix: Color| {
-                        if count % one_work_step == 0 {
+                        if count % (100 * real_samples_per_pixel) == 0 {
                             local_tx.send((thread_id, count)).unwrap();
                         }
                         count += real_samples_per_pixel;
@@ -236,28 +229,28 @@ fn render(
     drop(tx); // Drop the final sender, so the report_update_thread stops
 
     report_update_thread.join().unwrap();
+    let passed_time = std::time::Instant::now() - start_time;
+    let passed_time_seconds = passed_time.as_secs_f64();
+    eprintln!("\rRendering done in {passed_time_seconds} seconds"); // Leading \r to remove progress bar
 
     eprintln!("Merging threads...");
     merge_planes(planes)
 }
 
 fn split_work_tasks(samples_per_pixel: usize, thread_count: usize) -> Vec<(usize, usize)> {
-    let work_tasks = {
-        let whole_sample_per_pixel = samples_per_pixel / thread_count;
-        let remaining_samples_per_pixel = samples_per_pixel % thread_count;
-        let mut work_tasks = Vec::new();
-        let mut id = 0;
-        while id < thread_count {
-            let real_samples_per_pixel =
-                whole_sample_per_pixel + (id < remaining_samples_per_pixel) as usize;
-            if real_samples_per_pixel == 0 {
-                break;
-            }
-            work_tasks.push((id, real_samples_per_pixel));
-            id = id + 1;
+    let whole_sample_per_pixel = samples_per_pixel / thread_count;
+    let remaining_samples_per_pixel = samples_per_pixel % thread_count;
+    let mut work_tasks = Vec::new();
+    let mut id = 0;
+    while id < thread_count {
+        let real_samples_per_pixel =
+            whole_sample_per_pixel + (id < remaining_samples_per_pixel) as usize;
+        if real_samples_per_pixel == 0 {
+            break;
         }
-        work_tasks
-    };
+        work_tasks.push((id, real_samples_per_pixel));
+        id += 1;
+    }
     work_tasks
 }
 
