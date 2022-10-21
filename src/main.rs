@@ -38,22 +38,30 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
     ray: &Ray,
     world: &THit,
     rng: &mut TRng,
-    depth: i32,
+    max_depth : i32
 ) -> Color {
-    if depth <= 0 {
-        return Color::BLACK;
-    }
-
-    if let Some(interaction) = world.hit(ray, &(0.0001..f32::INFINITY)) {
-        if let Some((attentuation, scattered)) =
-            interaction.material.scatter(ray, &interaction, rng)
-        {
-            Color::convolution(attentuation, ray_color(&scattered, world, rng, depth - 1))
+    let mut depth = max_depth;
+    let mut attentuation : Color = Color::WHITE;
+    let mut cur_ray = ray.clone();
+    loop {
+        if let Some(interaction) = world.hit(&cur_ray, &(0.0001..f32::INFINITY)) {
+            if depth <= 1 {
+                return Color::BLACK;
+            } else {
+                if let Some((attentuation2, scattered)) =
+                    interaction.material.scatter(&cur_ray, &interaction, rng)
+                {
+                    attentuation = Color::convolution(attentuation, attentuation2);
+                    cur_ray = scattered;
+                    depth = depth - 1;
+                    continue;
+                } else {
+                    return Color::BLACK;
+                }
+            }
         } else {
-            Color::BLACK
+            return Color::convolution(attentuation, sky_color(ray));
         }
-    } else {
-        sky_color(ray)
     }
 }
 
