@@ -8,22 +8,16 @@ mod vec2;
 mod vec3;
 
 use std::{
-    fmt,
-    fs::{File, OpenOptions},
-    io::Write,
     path::Path,
-    thread::{self, Scope},
+    thread::{self},
 };
 
 use camera::Camera;
 use color::Color;
 use hittable::{HitInteraction, Hittable, HittableList, Sphere};
 
-use rand::{
-    distributions::Uniform,
-    rngs::{StdRng},
-    Rng, SeedableRng,
-};
+use image::ImageError;
+use rand::{distributions::Uniform, Rng, SeedableRng};
 use rand_distr::{Distribution, UnitBall, UnitSphere};
 use ray::Ray;
 use size2i::Size2i;
@@ -97,8 +91,8 @@ impl Material {
     }
 }
 
-fn main() -> Result<(), std::io::Error> {
-    let path = Path::new("output/image.ppm");
+fn main() -> Result<(), ImageError> {
+    let path = Path::new("output/image.png");
     let image_size = Size2i::new(400, 225);
     let samples_per_pixel = 100;
     let max_depth = 50;
@@ -154,30 +148,65 @@ fn main() -> Result<(), std::io::Error> {
         ));
         world
     };
-    let distr = Uniform::new(
+    let pixels = render(
+        image_size,
+        thread_count,
+        samples_per_pixel,
+        max_depth,
+        &camera,
+        &world,
+    );
+    let bytes = pixels.iter().flat_map(|c| c.to_rgb8()).collect::<Vec<_>>();
+    image::save_buffer(
+        path,
+        &bytes,
+        image_size.width as u32,
+        image_size.height as u32,
+        image::ColorType::Rgb8,
+    )
+}
+
+fn render(
+    image_size: Size2i,
+    thread_count: usize,
+    samples_per_pixel: i32,
+    max_depth: i32,
+    camera: &Camera,
+    world: &HittableList,
+) -> Vec<Color> {
+
+    let pixel_sample_distr = Uniform::new(
         Vec2f { x: 0.0, y: 0.0 },
         Vec2f {
             x: 1.0 / (image_size.width - 1) as f32,
             y: 1.0 / (image_size.height - 1) as f32,
         },
     );
+    let pixel_sample_distr_ref = &pixel_sample_distr;
+    let mut rng = rand::rngs::StdRng::from_entropy();
     let planes = thread::scope(|s| {
-        thread_scope(
-            s,
-            thread_count,
-            rand::rngs::StdRng::from_entropy(),
-            image_size,
-            samples_per_pixel,
-            max_depth,
-            &camera,
-            &world,
-            &distr)
+        let real_sample_per_pixel = samples_per_pixel / thread_count as i32;
+        (0..thread_count)
+            .map(|_| {
+                let mut sub_rng = rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
+                let per_pixel = move |fpix: Vec2f| {
+                    (0..real_sample_per_pixel)
+                        .map(|_| {
+                            let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
+                            let ray = camera.ray(pix);
+                            ray_color(&ray, world, &mut sub_rng, max_depth)
+                        })
+                        .sum::<Color>()
+                        / real_sample_per_pixel as f32
+                };
+
+                s.spawn(move || image_size.iterf().map(per_pixel).collect::<Vec<_>>())
+            })
+            .map(|t| t.join().unwrap())
+            .collect::<Vec<_>>()
     });
 
-    let pixels = merge_planes(image_size, planes, thread_count);
-    let out = OpenOptions::new().write(true).create(true).open(path)?;
-    write_ppm_image(out, pixels, image_size)?;
-    Ok(())
+    merge_planes(image_size, planes, thread_count)
 }
 
 fn merge_planes(image_size: Size2i, result: Vec<Vec<Color>>, thread_count: usize) -> Vec<Color> {
@@ -191,58 +220,4 @@ fn merge_planes(image_size: Size2i, result: Vec<Vec<Color>>, thread_count: usize
         *pix = *pix / (thread_count as f32);
     }
     pixels
-}
-
-fn thread_scope<'scope, 'env>(
-    s: &'scope Scope<'scope, 'env>,
-    thread_count: usize,
-    mut rng: StdRng,
-
-    image_size: Size2i,
-    samples_per_pixel: i32,
-    max_depth: i32,
-
-    camera: &'env Camera,
-    world: &'env HittableList,
-    distr: &'env Uniform<Vec2f>
-) -> Vec<Vec<Color>> {
-    let real_sample_per_pixel = samples_per_pixel / thread_count as i32;
-    (0..thread_count)
-        .map(|_| {
-            let mut sub_rng = rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
-            let per_pixel = move |fpix: Vec2f| {
-                (0..real_sample_per_pixel)
-                    .map(|_| {
-                        let pix = fpix + sub_rng.sample(distr);
-                        let ray = camera.ray(pix);
-                        ray_color(&ray, world, &mut sub_rng, max_depth)
-                    })
-                    .sum::<Color>()
-                    / real_sample_per_pixel as f32
-            };
-
-            s.spawn(move || image_size.iterf().map(per_pixel).collect::<Vec<_>>())
-        })
-        .map(|t| t.join().unwrap())
-        .collect::<Vec<_>>()
-}
-
-fn write_ppm_image<I: IntoIterator<Item = Color>>(
-    mut out: File,
-    pixels: I,
-    image_size: Size2i,
-) -> Result<(), std::io::Error> {
-    out.write_all(
-        fmt::format(format_args!(
-            "P3\n{} {}\n255\n",
-            image_size.width, image_size.height
-        ))
-        .as_bytes(),
-    )?;
-    for pix in pixels {
-        out.write_all(pix.to_ppm_string().as_bytes())?;
-        out.write_all("\n".as_bytes())?;
-    }
-
-    Ok(())
 }

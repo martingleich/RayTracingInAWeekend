@@ -12,11 +12,11 @@ impl Color {
         Self { r, g, b }
     }
 
-    pub fn to_ppm_string(&self) -> String {
+    pub fn to_rgb8(&self) -> [u8; 3] {
         let ir = math::clamp(0.0, 255.0, self.r * 256.0) as u8;
         let ig = math::clamp(0.0, 255.0, self.g * 256.0) as u8;
         let ib = math::clamp(0.0, 255.0, self.b * 256.0) as u8;
-        format!("{ir} {ig} {ib}")
+        [ir, ig, ib]
     }
 
     pub const BLACK: Self = Self {
