@@ -4,7 +4,7 @@ use rand::distributions::Uniform;
 use rand::prelude::Distribution;
 use rand::Rng;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Vec2<T> {
     pub x: T,
     pub y: T,

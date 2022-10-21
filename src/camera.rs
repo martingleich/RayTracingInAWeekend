@@ -25,7 +25,7 @@ impl Camera {
         let sforward = forward.with_length(focal_length);
 
         Self {
-            position: position,
+            position,
             upper_left_corner: sright * -0.5 + sup * 0.5 + sforward,
             right: sright,
             up: sup,

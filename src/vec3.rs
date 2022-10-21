@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Vec3<T> {
     pub e: [T; 3],
 }
@@ -179,7 +179,7 @@ impl std::ops::Sub<Point3> for Point3 {
 impl std::ops::Sub<Dir3> for Point3 {
     type Output = Point3;
     fn sub(self, rhs: Dir3) -> Self::Output {
-        Self::Output { v: self.v + rhs.v }
+        Self::Output { v: self.v - rhs.v }
     }
 }
 

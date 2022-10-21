@@ -13,7 +13,7 @@ impl Color {
         }
     }
 
-    pub fn to_rgb8(&self) -> [u8; 3] {
+    pub fn to_rgb8(self) -> [u8; 3] {
         let ir = math::clamp(0.0, 255.0, self.v.e[0] * 256.0) as u8;
         let ig = math::clamp(0.0, 255.0, self.v.e[1] * 256.0) as u8;
         let ib = math::clamp(0.0, 255.0, self.v.e[2] * 256.0) as u8;
@@ -89,6 +89,6 @@ impl std::iter::Sum for Color {
         for x in iter {
             result += x;
         }
-        return result;
+        result
     }
 }

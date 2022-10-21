@@ -9,7 +9,7 @@
 			],
 			"group": "build",
 			"label": "rust: cargo build",
-			"dependsOn": ["rust: cargo fmt"]
+			"dependsOn": ["rust: cargo fmt", "rust: cargo clippy"]
 		},
 		{
 			"type": "cargo",
@@ -18,6 +18,17 @@
 			"problemMatcher": [],
 			"group": "none",
 			"label": "rust: cargo fmt"
+		},
+		{
+			"type": "cargo",
+			"command": "clippy",
+			"args": ["--all"],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "none",
+			"label": "rust: cargo clippy",
+			"dependsOn": ["rust: cargo fmt"]
 		}
 	]
 }

@@ -8,11 +8,7 @@ mod size2i;
 mod vec2;
 mod vec3;
 
-use std::{
-    path::Path,
-    sync::mpsc,
-    thread::{self},
-};
+use std::{path::Path, sync::mpsc, thread};
 
 use camera::Camera;
 use color::Color;
@@ -41,22 +37,20 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
 ) -> Color {
     let mut depth = max_depth;
     let mut attentuation: Color = Color::WHITE;
-    let mut cur_ray = ray.clone();
+    let mut cur_ray = *ray;
     loop {
         if let Some(interaction) = world.hit(&cur_ray, &(0.0001..f32::INFINITY)) {
             if depth <= 1 {
                 return Color::BLACK;
+            } else if let Some((attentuation2, scattered)) =
+                interaction.material.scatter(&cur_ray, &interaction, rng)
+            {
+                attentuation = Color::convolution(attentuation, attentuation2);
+                cur_ray = scattered;
+                depth -= 1;
+                continue;
             } else {
-                if let Some((attentuation2, scattered)) =
-                    interaction.material.scatter(&cur_ray, &interaction, rng)
-                {
-                    attentuation = Color::convolution(attentuation, attentuation2);
-                    cur_ray = scattered;
-                    depth = depth - 1;
-                    continue;
-                } else {
-                    return Color::BLACK;
-                }
+                return Color::BLACK;
             }
         } else {
             return Color::convolution(attentuation, sky_color(ray));
@@ -67,7 +61,7 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
     let image_size = Size2i::new(800, 450);
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 200;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(4, |x| x.get());
     eprintln!("Using {thread_count} threads.");
@@ -93,11 +87,11 @@ fn main() -> Result<(), ImageError> {
         };
         let material_left = Material::Metal {
             albedo: Color::new_rgb(0.6, 0.6, 0.8),
-            fuzz: 0.0,
+            fuzz: 0.05,
         };
         let material_right = Material::Metal {
             albedo: Color::new_rgb(0.8, 0.6, 0.2),
-            fuzz: 1.0,
+            fuzz: 0.5,
         };
         world.push(Sphere::new(
             Point3::ORIGIN + Dir3::DOWN * 100.5,
@@ -161,13 +155,17 @@ fn render(
 
     let total_work = samples_per_pixel * image_size.count();
     let mut done_work = vec![0; thread_count];
+    let mut last_output = usize::MAX;
     let report_update_thread = thread::spawn(move || loop {
         match rx.recv() {
             Ok((id, done)) => {
                 done_work[id] = done;
                 let total_done = done_work.iter().sum::<usize>();
                 let done_percent = (100 * total_done) / total_work;
-                eprint!("\r{done_percent} %");
+                if last_output != done_percent {
+                    last_output = done_percent;
+                    eprint!("\r{done_percent} %");
+                }
             }
             Err(_) => {
                 eprintln!("\rRendering done");
@@ -182,10 +180,16 @@ fn render(
     let planes = thread::scope(|s| {
         let whole_sample_per_pixel = samples_per_pixel / thread_count;
         let remaining_samples_per_pixel = samples_per_pixel % thread_count;
-        (0..thread_count)
-            .map(|thread_id| {
+
+        #[allow(clippy::needless_collect)]
+        // reason:"First start all threads, the collect them. Removing the collect would serialize the threads")]
+        let threads = (0..thread_count)
+            .filter_map(|thread_id| {
                 let real_samples_per_pixel =
                     whole_sample_per_pixel + (thread_id < remaining_samples_per_pixel) as usize;
+                if real_samples_per_pixel == 0 {
+                    return None;
+                }
                 let local_tx = tx.clone();
 
                 let mut sub_rng = rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
@@ -209,14 +213,18 @@ fn render(
                     fpix
                 };
 
-                s.spawn(move || {
+                Some(s.spawn(move || {
                     image_size
                         .iterf()
                         .map(per_pixel)
                         .map(update) // Sideeffect
                         .collect::<Vec<_>>()
-                })
+                }))
             })
+            .collect::<Vec<_>>();
+
+        threads
+            .into_iter()
             .map(|t| t.join().unwrap())
             .collect::<Vec<_>>()
     });
@@ -225,10 +233,11 @@ fn render(
     report_update_thread.join().unwrap();
 
     eprintln!("Merging threads...");
-    merge_planes(image_size, planes, thread_count)
+    merge_planes(image_size, planes)
 }
 
-fn merge_planes(image_size: Size2i, planes: Vec<Vec<Color>>, thread_count: usize) -> Vec<Color> {
+fn merge_planes(image_size: Size2i, planes: Vec<Vec<Color>>) -> Vec<Color> {
+    let multiplier = 1.0 / planes.len() as f32;
     let mut pixels: Vec<Color> = vec![Color::BLACK; image_size.count()];
     for plane in planes {
         for (p, i) in plane.iter().enumerate() {
@@ -236,7 +245,7 @@ fn merge_planes(image_size: Size2i, planes: Vec<Vec<Color>>, thread_count: usize
         }
     }
     for pix in &mut pixels {
-        *pix = *pix / (thread_count as f32);
+        *pix *= multiplier;
     }
     pixels
 }

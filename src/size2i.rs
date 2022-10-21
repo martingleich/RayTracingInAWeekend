@@ -1,6 +1,6 @@
 use crate::vec2::Vec2f;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct Size2i {
     pub width: i32,
     pub height: i32,
@@ -49,9 +49,9 @@ impl Iterator for Size2iIterGrid2f {
             self.x += 1;
         }
 
-        return Some(Vec2f {
+        Some(Vec2f {
             x: self.x as f32 * self.sx,
             y: self.y as f32 * self.sy,
-        });
+        })
     }
 }
