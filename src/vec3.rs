@@ -186,15 +186,21 @@ impl Dir3 {
     }
     pub fn unit_or_else(self, default: Dir3) -> Dir3 {
         let len_sq = self.length_squared();
-        if len_sq > 1e-8{
+        if len_sq > 1e-8 {
             self / len_sq.sqrt()
         } else {
             default
         }
     }
 
-    pub fn reflect(direction: Dir3, normal: Dir3) -> Dir3 {
-        direction - (2.0 * Self::dot(direction, normal)) * normal
+    pub fn reflect(ray: Dir3, normal: Dir3) -> Dir3 {
+        ray - (2.0 * Self::dot(ray, normal)) * normal
+    }
+    pub fn refract(ray: Dir3, normal: Dir3, etai_over_etat: f32) -> Dir3 {
+        let cos_theta = f32::min(Self::dot(-ray, normal), 1.0);
+        let r_out_perp = etai_over_etat * (ray + cos_theta * normal);
+        let r_out_parallel = -f32::sqrt(f32::abs(1.0 - r_out_perp.length_squared())) * normal;
+        r_out_perp + r_out_parallel
     }
 }
 
@@ -235,4 +241,3 @@ impl std::ops::Mul<Dir3> for f32 {
         rhs * self
     }
 }
-

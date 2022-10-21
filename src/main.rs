@@ -93,6 +93,9 @@ fn main() -> Result<(), ImageError> {
             albedo: Color::new_rgb(0.8, 0.6, 0.2),
             fuzz: 0.5,
         };
+        let material_front = Material::Dielectric {
+            index_of_refraction: 1.5,
+        };
         world.push(Sphere::new(
             Point3::ORIGIN + Dir3::DOWN * 100.5,
             100.0,
@@ -112,6 +115,11 @@ fn main() -> Result<(), ImageError> {
             Point3::ORIGIN + Dir3::RIGHT + Dir3::FORWARD,
             0.5,
             material_right,
+        ));
+        world.push(Sphere::new(
+            Point3::ORIGIN + 0.5 * Dir3::LEFT + 0.2 * Dir3::DOWN,
+            0.3,
+            material_front,
         ));
         world
     };
