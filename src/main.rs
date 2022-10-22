@@ -60,22 +60,21 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
 
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
-    let image_size = Size2i::new(800, 450);
-    let samples_per_pixel = 200;
+    let image_size = Size2i::new(800, 600);
+    let samples_per_pixel = 500;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(4, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
     let viewport_width = 1.2;
     let viewport_height = image_size.aspect_ratio() * viewport_width;
-
     let camera = Camera::new_look_at(
         viewport_width,
         viewport_height,
-        1.0,
-        Point3::ORIGIN + Dir3::BACKWARD * 3.0 + Dir3::UP * 3.0 + Dir3::RIGHT,
+        Point3::ORIGIN + Dir3::BACKWARD * 3.0 + Dir3::UP * 3.0 + 3.0*Dir3::RIGHT,
         Dir3::UP,
-        Point3::ORIGIN,
+        Point3::ORIGIN + Dir3::FORWARD,
+        0.1
     );
 
     let world = {
@@ -199,7 +198,7 @@ fn render(
                         (0..real_samples_per_pixel)
                             .map(|_| {
                                 let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
-                                let ray = camera.ray(pix);
+                                let ray = camera.ray(&mut sub_rng, pix);
                                 ray_color(&ray, world, &mut sub_rng, max_depth)
                             })
                             .sum::<Color>()

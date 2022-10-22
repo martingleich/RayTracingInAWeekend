@@ -129,6 +129,10 @@ impl Dir3 {
     pub fn new_from_arr(c: [f32; 3]) -> Self {
         Self::new(c[0], c[1], c[2])
     }
+    
+    pub fn new_xy_from_arr(c: [f32; 2]) -> Self {
+        Self::new(c[0], c[1], 0.0)
+    }
 
     pub const ZERO: Self = Self(Vec3 { e: [0.0, 0.0, 0.0] });
     pub const RIGHT: Self = Self(Vec3 { e: [1.0, 0.0, 0.0] });
@@ -202,6 +206,7 @@ impl Dir3 {
         let r_out_parallel = -f32::sqrt(f32::abs(1.0 - r_out_perp.length_squared())) * normal;
         r_out_perp + r_out_parallel
     }
+
 }
 
 // Point
