@@ -48,8 +48,6 @@ impl Color {
             a.0.e[2] * b.0.e[2],
         )
     }
-
-
 }
 
 impl std::ops::Mul<Color> for f32 {

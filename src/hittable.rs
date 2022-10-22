@@ -18,23 +18,23 @@ pub struct HitInteraction {
 impl HitInteraction {
     pub fn new_from_ray(
         ray: &Ray,
-        position: Point3,
-        surface_normal: Dir3,
+        position: &Point3,
+        surface_normal: &Dir3,
         t: f32,
-        material: Material,
+        material: &Material,
     ) -> Self {
-        let front_face = Dir3::dot(surface_normal, ray.direction) < 0.0;
+        let front_face = Dir3::dot(*surface_normal, ray.direction) < 0.0;
         let normal = if front_face {
-            surface_normal
+            *surface_normal
         } else {
-            -surface_normal
+            -*surface_normal
         };
         Self {
-            position,
+            position: *position,
             normal,
             t,
             front_face,
-            material,
+            material: *material,
         }
     }
 }
@@ -62,35 +62,36 @@ impl Sphere {
 
 impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
-        let maybe_t: Option<f32> = {
-            let oc = ray.origin - self.center;
-            // let a = ray.direction.length_squared();
-            let a = 1.0; // The lenght of the direction is guaranteed to be 1
-            let half_b = Dir3::dot(oc, ray.direction);
-            let c = oc.length_squared() - self.radius * self.radius;
-            let disc = half_b * half_b - a * c;
-            if disc < 0.0 {
-                None
+        let oc = ray.origin - self.center;
+        let half_b = Dir3::dot(oc, ray.direction);
+        let c = oc.length_squared() - self.radius * self.radius;
+        let disc = half_b * half_b - c;
+        if disc < 0.0 {
+            None
+        } else {
+            let sqrtd = disc.sqrt();
+            let root_small = -half_b - sqrtd;
+            let root: f32;
+            if t_range.contains(&root_small) {
+                root = root_small;
             } else {
-                let sqrtd = disc.sqrt();
-                let root_small = (-half_b - sqrtd) / a;
-                if t_range.contains(&root_small) {
-                    Some(root_small)
+                let root_large = -half_b + sqrtd;
+                if t_range.contains(&root_large) {
+                    root = root_large;
                 } else {
-                    let root_large = (-half_b + sqrtd) / a;
-                    if t_range.contains(&root_large) {
-                        Some(root_large)
-                    } else {
-                        None
-                    }
+                    return None;
                 }
             }
-        };
-        maybe_t.map(|t| {
-            let position = ray.at(t);
+            let position = ray.at(root);
             let surface_normal = (position - self.center) / self.radius;
-            HitInteraction::new_from_ray(ray, position, surface_normal, t, self.material)
-        })
+            Some(HitInteraction::new_from_ray(
+                ray,
+                &position,
+                &surface_normal,
+                root,
+                &self.material,
+            ))
+        }
     }
 }
 
@@ -111,9 +112,14 @@ impl HittableList {
 
 impl Hittable for HittableList {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
-        self.spheres
-            .iter()
-            .filter_map(|s| s.hit(ray, t_range))
-            .min_by(|a, b| a.t.partial_cmp(&b.t).unwrap())
+        let mut range = t_range.clone();
+        let mut min_interaction : Option<HitInteraction> = None;
+        for sph in &self.spheres {
+            if let Some(hi) = sph.hit(ray, &range) {
+                range.end = hi.t;
+                min_interaction = Some(hi);
+            }
+        }
+        min_interaction
     }
 }

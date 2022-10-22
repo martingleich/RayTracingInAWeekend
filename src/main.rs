@@ -25,13 +25,16 @@ use vec3::Dir3;
 
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
-    let image_size = Size2i::new(1920, 1080);
-    let samples_per_pixel = 2000;
+    let image_size = Size2i::new(400, 225);
+    let samples_per_pixel = 100;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
-    let (camera, world) = worlds::create_world_random_scene(image_size.aspect_ratio(), [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
+    let (camera, world) = worlds::create_world_random_scene(
+        image_size.aspect_ratio(),
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    );
 
     let pixels = render(
         image_size,
@@ -52,7 +55,6 @@ fn main() -> Result<(), ImageError> {
         image::ColorType::Rgb8,
     )
 }
-
 
 fn sky_color(ray: &Ray) -> Color {
     let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
