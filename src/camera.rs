@@ -23,13 +23,14 @@ impl Camera {
         position: Point3,
         up: Dir3,
         look_at: Point3,
-        aperture : f32
+        aperture : f32,
+        focus_offset : f32,
     ) -> Camera {
         let forward = look_at - position;
         Self::new(
             viewport_width,
             viewport_height,
-            forward.length(),
+            forward.length() + focus_offset,
             position,
             up,
             forward,

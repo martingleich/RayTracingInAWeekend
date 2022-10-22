@@ -23,7 +23,9 @@ impl Color {
     pub fn new_rgb(r: f32, g: f32, b: f32) -> Self {
         Self(Vec3::new(r, g, b))
     }
-
+    pub fn new_rgb_arr(c: [f32; 3]) -> Self {
+        Self::new_rgb(c[0], c[1], c[2])
+    }
     pub fn to_rgb8(self) -> [u8; 3] {
         let ir = math::clamp(0.0, 255.0, self.0.e[0] * 256.0) as u8;
         let ig = math::clamp(0.0, 255.0, self.0.e[1] * 256.0) as u8;
@@ -46,6 +48,8 @@ impl Color {
             a.0.e[2] * b.0.e[2],
         )
     }
+
+
 }
 
 impl std::ops::Mul<Color> for f32 {
