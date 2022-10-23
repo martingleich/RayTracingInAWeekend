@@ -4,12 +4,27 @@ use rand::distributions::Uniform;
 use rand::prelude::Distribution;
 use rand::Rng;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, derive_more::Add)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, derive_more::Add, derive_more::Neg, derive_more::Sub,
+)]
 pub struct Vec2<T> {
     pub x: T,
     pub y: T,
 }
 pub type Vec2f = Vec2<f32>;
+
+impl<T> Vec2<T> {
+    pub fn new(x: T, y: T) -> Self {
+        Self { x, y }
+    }
+}
+
+impl Vec2f {
+    pub const ZERO: Vec2f = Self { x: 0.0, y: 0.0 };
+    pub fn dot(a: Vec2f, b: Vec2f) -> f32 {
+        a.x * b.x + a.y * b.y
+    }
+}
 
 pub struct UniformVec2<T: SampleUniform> {
     x: Uniform<T>,

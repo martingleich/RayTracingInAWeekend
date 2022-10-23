@@ -17,6 +17,7 @@ pub struct Camera {
     scaled_up: Dir3,
     lens_radius: f32,
     time_interval: RangeInclusive<f32>,
+    shutter_pace: Vec2f,
 }
 
 impl Camera {
@@ -29,6 +30,7 @@ impl Camera {
         aperture: f32,
         focus_offset: f32,
         time_interval: RangeInclusive<f32>,
+        shutter_pace: Vec2f,
     ) -> Camera {
         let forward = look_at - position;
         Self::new(
@@ -40,6 +42,7 @@ impl Camera {
             forward,
             aperture,
             time_interval,
+            shutter_pace,
         )
     }
     pub fn new(
@@ -51,6 +54,7 @@ impl Camera {
         forward: Dir3,
         aperture: f32,
         time_interval: RangeInclusive<f32>,
+        shutter_pace: Vec2f,
     ) -> Camera {
         let unit_right = Dir3::cross(forward, up).unit();
         let unit_up = Dir3::cross(unit_right, forward).unit();
@@ -67,6 +71,7 @@ impl Camera {
             scaled_up: unit_up * (focus_distance * viewport_height),
             lens_radius: aperture / 2.0,
             time_interval,
+            shutter_pace,
         }
     }
 
@@ -76,7 +81,7 @@ impl Camera {
         let offset = self.lens_radius * (rdx * self.unit_right + rdy * self.unit_up);
 
         // Motion blur
-        let time = rng.gen_range(self.time_interval.clone());
+        let time = rng.gen_range(self.time_interval.clone()) + Vec2f::dot(self.shutter_pace, point);
 
         Ray::new(
             self.position + offset,

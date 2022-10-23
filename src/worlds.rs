@@ -5,6 +5,7 @@ use crate::color::Color;
 use crate::hittable::{Hittable, HittableList, MovingHittable, Sphere};
 
 use crate::material::Material;
+use crate::vec2::Vec2f;
 use crate::vec3::{Dir3, Point3};
 
 pub fn create_world_moving_spheres(aspect_ratio: f32) -> (Camera, HittableList<Box<dyn Hittable>>) {
@@ -23,6 +24,7 @@ pub fn create_world_moving_spheres(aspect_ratio: f32) -> (Camera, HittableList<B
         0.0,
         0.0,
         0.0..=0.5,
+        Vec2f::ZERO,
     );
 
     let world = {
@@ -73,6 +75,7 @@ pub fn create_world_random_scene(
         0.1,
         -3.5,
         0.0..=0.0,
+        Vec2f::ZERO,
     );
 
     let mut rng = rand_xoshiro::Xoroshiro128PlusPlus::from_seed(seed);
@@ -158,6 +161,7 @@ pub fn create_world_defocus_blur(aspect_ratio: f32) -> (Camera, HittableList<Sph
         0.1,
         0.0,
         0.0..=0.0,
+        Vec2f::ZERO,
     );
     let world = {
         let mut world = HittableList::<Sphere>::new();
