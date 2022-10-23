@@ -92,7 +92,7 @@ impl<T: std::ops::AddAssign<T> + std::default::Default + Copy> std::iter::Sum fo
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub struct Point3(Vec3<f32>);
+pub struct Point3(pub Vec3<f32>);
 
 #[derive(
     Debug,
@@ -110,7 +110,7 @@ pub struct Point3(Vec3<f32>);
     derive_more::DivAssign,
     derive_more::Sum,
 )]
-pub struct Dir3(Vec3<f32>);
+pub struct Dir3(pub Vec3<f32>);
 
 impl Point3 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {

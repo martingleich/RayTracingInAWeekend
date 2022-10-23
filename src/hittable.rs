@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use crate::{
+    aabb::AABB,
     ray::Ray,
     vec3::{Dir3, Point3},
     Material,
@@ -41,6 +42,7 @@ impl HitInteraction {
 
 pub trait Hittable: Send + Sync {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction>;
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -93,6 +95,10 @@ impl Hittable for Sphere {
             ))
         }
     }
+
+    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<AABB> {
+        Some(AABB::new_radius(self.center, self.radius))
+    }
 }
 
 pub struct MovingHittable<T: Hittable> {
@@ -112,6 +118,18 @@ impl<T: Hittable> Hittable for MovingHittable<T> {
         let mut moved_ray = *ray;
         moved_ray.origin = moved_ray.origin - self.velocity * ray.time;
         self.hittable.hit(&moved_ray, t_range)
+    }
+
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB> {
+        let start_box = self
+            .hittable
+            .bounding_box(&(time_range.start..time_range.start))?
+            .translate(self.velocity * time_range.start);
+        let end_box = self
+            .hittable
+            .bounding_box(&(time_range.end..time_range.end))?
+            .translate(self.velocity * time_range.end);
+        Some(AABB::new_surrounding(&start_box, &end_box))
     }
 }
 
@@ -134,6 +152,10 @@ impl Hittable for Box<dyn Hittable> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         self.as_ref().hit(ray, t_range)
     }
+
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB> {
+        self.as_ref().bounding_box(time_range)
+    }
 }
 
 impl<T: Hittable> Hittable for HittableList<T> {
@@ -147,5 +169,104 @@ impl<T: Hittable> Hittable for HittableList<T> {
             }
         }
         min_interaction
+    }
+
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB> {
+        // If any child is None -> None
+        // Empty list -> None
+        // else reduce(AABB::new_surounding)
+        let mut result: Option<AABB> = None;
+        for hittable in &self.hittables {
+            if let Some(aabb) = &hittable.bounding_box(time_range) {
+                if let Some(old) = &result {
+                    result = Some(AABB::new_surrounding(old, aabb))
+                } else {
+                    result = Some(*aabb);
+                }
+            } else {
+                return None;
+            }
+        }
+        result
+    }
+}
+
+struct BoundingVolumeHierarchy {
+    left: Box<dyn Hittable>,
+    right: Option<Box<dyn Hittable>>,
+    aabb: AABB,
+}
+
+impl BoundingVolumeHierarchy {
+    pub fn new(hittables : Vec<Box<dyn Hittable>>, time_range: &Range<f32>) -> BoundingVolumeHierarchy
+    {
+        let hittables = hittables.into_iter().map(|h| { let aabb = h.bounding_box(time_range).unwrap(); (h, aabb)}).collect::<Vec<_>>();
+        Self::new_inner(hittables, 0)
+    }
+
+    fn new_inner(
+        mut hittables: Vec<(Box<dyn Hittable>, AABB)>,
+        axis_id: usize,
+    ) -> BoundingVolumeHierarchy {
+        if hittables.len() == 1 {
+            let (hittable, aabb) = hittables.pop().unwrap();
+            Self {
+                aabb,
+                left: hittable,
+                right: None,
+            }
+        } else {
+            let comparer =
+                |a: &AABB, b: &AABB| a.min.0.e[axis_id].partial_cmp(&b.min.0.e[axis_id]).unwrap();
+            hittables.sort_by(|a, b| comparer(&a.1, &b.1));
+            if hittables.len() == 2 {
+                let (left_hittable, left_box) = hittables.pop().unwrap();
+                let (right_hittable, right_box) = hittables.pop().unwrap();
+                Self {
+                    aabb: AABB::new_surrounding(&left_box, &right_box),
+                    left: left_hittable,
+                    right: Some(right_hittable),
+                }
+            } else {
+                let mid = hittables.len() / 2;
+                let mut right_half = Vec::new();
+                for _ in 0..mid {
+                    right_half.push(hittables.pop().unwrap());
+                }
+                let left = Box::new(Self::new_inner(hittables, (axis_id + 1) % 3));
+                let right = Box::new(Self::new_inner(right_half, (axis_id + 1) % 3));
+                Self {
+                    aabb: AABB::new_surrounding(&left.aabb, &right.aabb),
+                    left: left,
+                    right: Some(right),
+                }
+            }
+        }
+    }
+}
+
+impl Hittable for BoundingVolumeHierarchy {
+    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+        if self.aabb.hit(ray, t_range) {
+            let mut range = t_range.clone();
+            let mut min_interaction: Option<HitInteraction> = None;
+            if let Some(hi) = self.left.hit(ray, &range) {
+                range.end = hi.t;
+                min_interaction = Some(hi);
+            }
+            if let Some(right) = &self.right {
+                if let Some(hi) = right.hit(ray, &range) {
+                    range.end = hi.t;
+                    min_interaction = Some(hi);
+                }
+            }
+            min_interaction
+        } else {
+            None
+        }
+    }
+
+    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<AABB> {
+        Some(self.aabb)
     }
 }
