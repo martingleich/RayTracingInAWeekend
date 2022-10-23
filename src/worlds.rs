@@ -2,15 +2,66 @@ use rand::{Rng, SeedableRng};
 
 use crate::camera::Camera;
 use crate::color::Color;
-use crate::hittable::{HittableList, Sphere};
+use crate::hittable::{Hittable, HittableList, MovingHittable, Sphere};
 
 use crate::material::Material;
 use crate::vec3::{Dir3, Point3};
 
+pub fn create_world_moving_spheres(aspect_ratio: f32) -> (Camera, HittableList<Box<dyn Hittable>>) {
+    // One large sphere as ground,
+    // One sphere moving fast from left to right
+    // One sphere moving fast fro up to down
+
+    let viewport_width = 1.2;
+    let viewport_height = aspect_ratio * viewport_width;
+    let camera = Camera::new_look_at(
+        viewport_width,
+        viewport_height,
+        Point3::new(0.0, 2.0, 10.0),
+        Dir3::UP,
+        Point3::new(0.0, 2.0, 0.0),
+        0.0,
+        0.0,
+        0.0..=0.5,
+    );
+
+    let world = {
+        let mut world = HittableList::<Box<dyn Hittable>>::new();
+        let ground_material = Material::Lambert {
+            albedo: Color::new_rgb(0.5, 0.5, 0.5),
+        };
+        let ground_radius = 100.0;
+        let ground_center = Point3::new(0.0, -ground_radius, 0.0);
+        world.push(Box::new(Sphere::new(
+            ground_center,
+            ground_radius,
+            ground_material,
+        )));
+        let material1 = Material::Lambert {
+            albedo: Color::new_rgb(0.2, 0.2, 0.6),
+        };
+        let sphere1 = Sphere::new(Point3::new(-2.0, 1.5, 0.0), 0.5, material1);
+        let moving_sphere_1 = MovingHittable::new(sphere1, Dir3::new(2.0, 0.0, 0.0));
+
+        let material2 = Material::Lambert {
+            albedo: Color::new_rgb(0.6, 0.2, 0.2),
+        };
+        let sphere2 = Sphere::new(Point3::new(0.0, 0.5, 0.0), 0.5, material2);
+        let moving_sphere_2 = MovingHittable::new(sphere2, Dir3::new(0.0, 1.0, 0.0));
+
+        world.push(Box::new(moving_sphere_1));
+        world.push(Box::new(moving_sphere_2));
+
+        world
+    };
+
+    (camera, world)
+}
+
 pub fn create_world_random_scene(
     aspect_ratio: f32,
     seed: <rand_xoshiro::Xoroshiro128PlusPlus as SeedableRng>::Seed,
-) -> (Camera, HittableList) {
+) -> (Camera, HittableList<Sphere>) {
     let viewport_width = 1.2;
     let viewport_height = aspect_ratio * viewport_width;
     let camera = Camera::new_look_at(
@@ -21,12 +72,13 @@ pub fn create_world_random_scene(
         Point3::ORIGIN,
         0.1,
         -3.5,
+        0.0..=0.0,
     );
 
     let mut rng = rand_xoshiro::Xoroshiro128PlusPlus::from_seed(seed);
 
     let world = {
-        let mut world = HittableList::new();
+        let mut world = HittableList::<Sphere>::new();
         let ground_material = Material::Lambert {
             albedo: Color::new_rgb(0.5, 0.5, 0.5),
         };
@@ -51,10 +103,7 @@ pub fn create_world_random_scene(
                     } else if material_sample < 0.95 {
                         let albedo = rand_color(&mut rng);
                         let fuzz = rng.gen_range(0.0..0.5);
-                        Material::Metal {
-                            albedo,
-                            fuzz,
-                        }
+                        Material::Metal { albedo, fuzz }
                     } else {
                         Material::Dielectric {
                             index_of_refraction: 1.5,
@@ -97,7 +146,7 @@ pub fn create_world_random_scene(
     (camera, world)
 }
 
-pub fn create_world_defocus_blur(aspect_ratio: f32) -> (Camera, HittableList) {
+pub fn create_world_defocus_blur(aspect_ratio: f32) -> (Camera, HittableList<Sphere>) {
     let viewport_width = 1.2;
     let viewport_height = aspect_ratio * viewport_width;
     let camera = Camera::new_look_at(
@@ -108,9 +157,10 @@ pub fn create_world_defocus_blur(aspect_ratio: f32) -> (Camera, HittableList) {
         Point3::ORIGIN + Dir3::FORWARD,
         0.1,
         0.0,
+        0.0..=0.0,
     );
     let world = {
-        let mut world = HittableList::new();
+        let mut world = HittableList::<Sphere>::new();
         let material_ground = Material::Lambert {
             albedo: Color::new_rgb(0.8, 0.8, 0.0),
         };
@@ -155,5 +205,6 @@ pub fn create_world_defocus_blur(aspect_ratio: f32) -> (Camera, HittableList) {
         ));
         world
     };
+
     (camera, world)
 }

@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use rand_distr::Distribution;
 
 use crate::{
@@ -14,6 +16,7 @@ pub struct Camera {
     scaled_right: Dir3,
     scaled_up: Dir3,
     lens_radius: f32,
+    time_interval: RangeInclusive<f32>,
 }
 
 impl Camera {
@@ -25,6 +28,7 @@ impl Camera {
         look_at: Point3,
         aperture: f32,
         focus_offset: f32,
+        time_interval: RangeInclusive<f32>,
     ) -> Camera {
         let forward = look_at - position;
         Self::new(
@@ -35,6 +39,7 @@ impl Camera {
             up,
             forward,
             aperture,
+            time_interval,
         )
     }
     pub fn new(
@@ -45,6 +50,7 @@ impl Camera {
         up: Dir3,
         forward: Dir3,
         aperture: f32,
+        time_interval: RangeInclusive<f32>,
     ) -> Camera {
         let unit_right = Dir3::cross(forward, up).unit();
         let unit_up = Dir3::cross(unit_right, forward).unit();
@@ -60,12 +66,17 @@ impl Camera {
             scaled_right: unit_right * (focus_distance * viewport_width),
             scaled_up: unit_up * (focus_distance * viewport_height),
             lens_radius: aperture / 2.0,
+            time_interval,
         }
     }
 
     pub fn ray<TRng: rand::Rng>(&self, rng: &mut TRng, point: Vec2f) -> Ray {
+        // Defocus blur
         let [rdx, rdy]: [f32; 2] = rand_distr::UnitDisc.sample(rng);
         let offset = self.lens_radius * (rdx * self.unit_right + rdy * self.unit_up);
+
+        // Motion blur
+        let time = rng.gen_range(self.time_interval.clone());
 
         Ray::new(
             self.position + offset,
@@ -73,6 +84,7 @@ impl Camera {
                 - point.y * self.scaled_up
                 - offset)
                 .unit(),
+            time,
         )
     }
 }

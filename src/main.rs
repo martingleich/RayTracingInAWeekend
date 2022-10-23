@@ -13,7 +13,7 @@ use std::{path::Path, sync::mpsc, thread};
 
 use camera::Camera;
 use color::Color;
-use hittable::{Hittable, HittableList};
+use hittable::Hittable;
 
 use image::ImageError;
 use material::Material;
@@ -31,10 +31,7 @@ fn main() -> Result<(), ImageError> {
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
-    let (camera, world) = worlds::create_world_random_scene(
-        image_size.aspect_ratio(),
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
-    );
+    let (camera, world) = worlds::create_world_moving_spheres(image_size.aspect_ratio());
 
     let pixels = render(
         image_size,
@@ -92,13 +89,13 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
     }
 }
 
-fn render(
+fn render<T: Hittable>(
     image_size: Size2i,
     thread_count: usize,
     samples_per_pixel: usize,
     max_depth: i32,
     camera: &Camera,
-    world: &HittableList,
+    world: &T,
 ) -> Vec<Color> {
     eprintln!("Start rendering...");
     let start_time = std::time::Instant::now();

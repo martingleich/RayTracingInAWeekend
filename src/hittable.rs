@@ -39,7 +39,7 @@ impl HitInteraction {
     }
 }
 
-pub trait Hittable {
+pub trait Hittable: Send + Sync {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction>;
 }
 
@@ -95,27 +95,53 @@ impl Hittable for Sphere {
     }
 }
 
-pub struct HittableList {
-    spheres: Vec<Sphere>,
+pub struct MovingHittable<T: Hittable> {
+    velocity: Dir3,
+    hittable: T,
 }
 
-impl HittableList {
+impl<T: Hittable> MovingHittable<T> {
+    pub fn new(hittable: T, velocity: Dir3) -> Self {
+        Self { hittable, velocity }
+    }
+}
+
+impl<T: Hittable> Hittable for MovingHittable<T> {
+    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+        // Instead of transforming the object the just move the ray backward
+        let mut moved_ray = *ray;
+        moved_ray.origin = moved_ray.origin - self.velocity * ray.time;
+        self.hittable.hit(&moved_ray, t_range)
+    }
+}
+
+pub struct HittableList<T: Hittable> {
+    hittables: Vec<T>,
+}
+
+impl<T: Hittable> HittableList<T> {
     pub fn new() -> Self {
         Self {
-            spheres: Vec::new(),
+            hittables: Vec::new(),
         }
     }
-    pub fn push(&mut self, sphere: Sphere) {
-        self.spheres.push(sphere);
+    pub fn push(&mut self, hittable: T) {
+        self.hittables.push(hittable);
     }
 }
 
-impl Hittable for HittableList {
+impl Hittable for Box<dyn Hittable> {
+    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+        self.as_ref().hit(ray, t_range)
+    }
+}
+
+impl<T: Hittable> Hittable for HittableList<T> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         let mut range = t_range.clone();
-        let mut min_interaction : Option<HitInteraction> = None;
-        for sph in &self.spheres {
-            if let Some(hi) = sph.hit(ray, &range) {
+        let mut min_interaction: Option<HitInteraction> = None;
+        for hittable in &self.hittables {
+            if let Some(hi) = hittable.hit(ray, &range) {
                 range.end = hi.t;
                 min_interaction = Some(hi);
             }

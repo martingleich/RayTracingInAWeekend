@@ -24,7 +24,7 @@ impl Material {
             Material::Lambert { albedo } => {
                 let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng)))
                     .unit_or_else(interaction.normal);
-                let scattered = Ray::new(interaction.position, direction);
+                let scattered = Ray::new(interaction.position, direction, ray.time);
                 Some((albedo, scattered))
             }
             Material::Metal { albedo, fuzz } => {
@@ -35,7 +35,7 @@ impl Material {
                 };
                 let direction = Dir3::reflect(ray.direction, interaction.normal) + fuzz_dir;
                 if Dir3::dot(direction, interaction.normal) > 0.0 {
-                    let scattered = Ray::new(interaction.position, direction.unit());
+                    let scattered = Ray::new(interaction.position, direction.unit(), ray.time);
                     Some((albedo, scattered))
                 } else {
                     None
@@ -59,7 +59,7 @@ impl Material {
                 } else {
                     Dir3::refract(ray.direction, interaction.normal, refraction_ratio)
                 };
-                let scattered = Ray::new(interaction.position, direction);
+                let scattered = Ray::new(interaction.position, direction, ray.time);
                 Some((Color::WHITE, scattered))
             }
         }

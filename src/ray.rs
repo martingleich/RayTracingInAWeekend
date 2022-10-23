@@ -5,12 +5,17 @@ use crate::vec3::Point3;
 pub struct Ray {
     pub origin: Point3,
     pub direction: Dir3,
+    pub time: f32,
 }
 
 impl Ray {
-    pub fn new(origin: Point3, direction: Dir3) -> Self {
+    pub fn new(origin: Point3, direction: Dir3, time: f32) -> Self {
         debug_assert!(direction.length_squared() > 0.99 && direction.length_squared() < 1.01);
-        Self { origin, direction }
+        Self {
+            origin,
+            direction,
+            time,
+        }
     }
 
     pub fn at(self, t: f32) -> Point3 {
