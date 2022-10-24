@@ -134,12 +134,13 @@ impl ActualCameraBuilder {
         let unit_up = Dir3::cross(unit_right, self.forward).unit();
         let sforward = self.forward.with_length(self.focus_distance);
 
-        Camera {
-            position: self.position,
-            upper_left_corner: self.focus_distance
+        let upper_left_corner = self.focus_distance
                 * (unit_right * (self.viewport_width * -0.5)
                     + unit_up * (self.viewport_height * 0.5))
-                + sforward,
+                + sforward;
+        Camera {
+            position: self.position,
+            upper_left_corner,
             unit_right,
             unit_up,
             scaled_right: unit_right * (self.focus_distance * self.viewport_width),
