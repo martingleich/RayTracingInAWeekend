@@ -7,6 +7,24 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug run 'ray_tracing_in_a_weekend'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=ray_tracing_in_a_weekend",
+                    "--package=ray_tracing_in_a_weekend",
+                ],
+                "filter": {
+                    "name": "ray_tracing_in_a_weekend",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Release run 'ray_tracing_in_a_weekend'",
             "cargo": {
                 "args": [
