@@ -11,6 +11,7 @@ pub enum Material<'a> {
     Lambert { albedo: &'a Texture<'a> },
     Metal { albedo: &'a Texture<'a>, fuzz: f32 },
     Dielectric { index_of_refraction: f32 },
+    DiffuseLight { emit: &'a Texture<'a> },
 }
 
 impl<'a> Material<'a> {
@@ -64,11 +65,17 @@ impl<'a> Material<'a> {
                 let scattered = Ray::new(interaction.position, direction, ray.time);
                 Some((Color::WHITE, scattered))
             }
+            _ => None,
         }
     }
 
+    pub fn emit(&self, interaction: &HitInteraction) -> Color {
+        match *self {
+            Material::DiffuseLight { emit } => emit.sample(interaction),
+            _ => Color::BLACK,
+        }
+    }
 }
-
 
 fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
     let r0 = (1.0 - ref_idx) / (1.0 + ref_idx);

@@ -10,6 +10,13 @@ pub struct Aabb {
     pub max: Point3,
 }
 
+fn min_array(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0].min(b[0]), a[1].min(b[1]), a[1].min(b[1])]
+}
+fn max_array(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0].max(b[0]), a[1].max(b[1]), a[1].max(b[1])]
+}
+
 impl Aabb {
     pub fn new_corners(min: Point3, max: Point3) -> Self {
         Self { min, max }
@@ -20,19 +27,20 @@ impl Aabb {
             center + Dir3::new(radius, radius, radius),
         )
     }
-    pub fn new_surrounding(a: &Aabb, b: &Aabb) -> Self {
+    pub fn new_surrounding_boxes(a: &Aabb, b: &Aabb) -> Self {
         Self::new_corners(
-            Point3::new(
-                a.min.0.e[0].min(b.min.0.e[0]),
-                a.min.0.e[1].min(b.min.0.e[1]),
-                a.min.0.e[2].min(b.min.0.e[2]),
-            ),
-            Point3::new(
-                a.max.0.e[0].max(b.max.0.e[0]),
-                a.max.0.e[1].max(b.max.0.e[1]),
-                a.max.0.e[2].max(b.max.0.e[2]),
-            ),
+            Point3::new_from_arr(min_array(a.min.0.e, b.min.0.e)),
+            Point3::new_from_arr(max_array(a.max.0.e, b.max.0.e)),
         )
+    }
+    pub fn new_surrounding_points(points: &[Point3]) -> Self {
+        let mut min = points[0].0.e;
+        let mut max = points[0].0.e;
+        for p in &points[1..] {
+            min = min_array(min, p.0.e);
+            max = max_array(max, p.0.e);
+        }
+        Self::new_corners(Point3::new_from_arr(min), Point3::new_from_arr(max))
     }
 
     pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> bool {

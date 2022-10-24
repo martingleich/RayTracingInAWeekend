@@ -113,6 +113,85 @@ impl<'a> Hittable for Sphere<'a> {
     }
 }
 
+pub struct Rect<'a> {
+    corner: Point3,
+    axis_right: Dir3,
+    axis_up: Dir3,
+    material: &'a Material<'a>,
+}
+
+impl<'a> Rect<'a> {
+    pub fn new_xy(center: Point3, width: f32, height: f32, material: &'a Material<'a>) -> Self {
+        let axis_right = Dir3::RIGHT * width;
+        let axis_up = Dir3::UP * height;
+        Self {
+            corner: center - 0.5 * (axis_right + axis_up),
+            axis_right,
+            axis_up,
+            material,
+        }
+    }
+    pub fn new_xz(center: Point3, width: f32, depth: f32, material: &'a Material<'a>) -> Self {
+        let axis_right = Dir3::RIGHT * width;
+        let axis_up = Dir3::FORWARD * depth;
+        Self {
+            corner: center - 0.5 * (axis_right + axis_up),
+            axis_right,
+            axis_up,
+            material,
+        }
+    }
+    pub fn new_yz(center: Point3, height: f32, depth: f32, material: &'a Material<'a>) -> Self {
+        let axis_right = Dir3::UP * height;
+        let axis_up = Dir3::FORWARD * depth;
+        Self {
+            corner: center - 0.5 * (axis_right + axis_up),
+            axis_right,
+            axis_up,
+            material,
+        }
+    }
+}
+
+impl<'a> Hittable for Rect<'a> {
+    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+        let normal = Dir3::cross(self.axis_right, self.axis_up).unit();
+        let denom = Dir3::dot(ray.direction, normal);
+        if denom.abs() > 0.0001 {
+            let t = Dir3::dot(normal, self.corner - ray.origin) / denom;
+            if t_range.contains(&t) {
+                let position = ray.at(t);
+                let q = position - self.corner;
+                let v_temp = Dir3::cross(normal, self.axis_up);
+                let x = Dir3::dot(q, v_temp) / Dir3::dot(self.axis_right, v_temp);
+                if (0.0..1.0).contains(&x) {
+                    let v_temp = Dir3::cross(normal, self.axis_right);
+                    let y = Dir3::dot(q, v_temp) / Dir3::dot(self.axis_up, v_temp);
+                    if (0.0..1.0).contains(&y) {
+                        return Some(HitInteraction {
+                            position,
+                            normal,
+                            uv: Vec2f { x, y },
+                            t,
+                            front_face: denom <= 0.0,
+                            material: self.material,
+                        });
+                    }
+                }
+            };
+        };
+        None
+    }
+
+    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
+        let p1 = self.corner;
+        let p2 = self.corner + self.axis_right;
+        let p3 = self.corner + self.axis_up;
+        let p4 = self.corner + self.axis_right + self.axis_up;
+        Some(Aabb::new_surrounding_points(&[p1, p2, p3, p4]))
+    }
+}
+
 pub struct MovingHittable<T: Hittable> {
     velocity: Dir3,
     hittable: T,
@@ -141,7 +220,7 @@ impl<T: Hittable> Hittable for MovingHittable<T> {
             .hittable
             .bounding_box(&(time_range.end..time_range.end))?
             .translate(self.velocity * time_range.end);
-        Some(Aabb::new_surrounding(&start_box, &end_box))
+        Some(Aabb::new_surrounding_boxes(&start_box, &end_box))
     }
 }
 
@@ -191,7 +270,7 @@ impl<T: Hittable> Hittable for HittableList<T> {
         for hittable in &self.hittables {
             if let Some(aabb) = &hittable.bounding_box(time_range) {
                 if let Some(old) = &result {
-                    result = Some(Aabb::new_surrounding(old, aabb))
+                    result = Some(Aabb::new_surrounding_boxes(old, aabb))
                 } else {
                     result = Some(*aabb);
                 }
@@ -243,7 +322,7 @@ impl BoundingVolumeHierarchy {
                 let (left_hittable, left_box) = hittables.pop().unwrap();
                 let (right_hittable, right_box) = hittables.pop().unwrap();
                 Self {
-                    aabb: Aabb::new_surrounding(&left_box, &right_box),
+                    aabb: Aabb::new_surrounding_boxes(&left_box, &right_box),
                     left: left_hittable,
                     right: Some(right_hittable),
                 }
@@ -256,7 +335,7 @@ impl BoundingVolumeHierarchy {
                 let left = Box::new(Self::new_inner(hittables, (axis_id + 1) % 3));
                 let right = Box::new(Self::new_inner(right_half, (axis_id + 1) % 3));
                 Self {
-                    aabb: Aabb::new_surrounding(&left.aabb, &right.aabb),
+                    aabb: Aabb::new_surrounding_boxes(&left.aabb, &right.aabb),
                     left,
                     right: Some(right),
                 }

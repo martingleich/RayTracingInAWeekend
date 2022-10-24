@@ -135,9 +135,8 @@ impl ActualCameraBuilder {
         let sforward = self.forward.with_length(self.focus_distance);
 
         let upper_left_corner = self.focus_distance
-                * (unit_right * (self.viewport_width * -0.5)
-                    + unit_up * (self.viewport_height * 0.5))
-                + sforward;
+            * (unit_right * (self.viewport_width * -0.5) + unit_up * (self.viewport_height * 0.5))
+            + sforward;
         Camera {
             position: self.position,
             upper_left_corner,

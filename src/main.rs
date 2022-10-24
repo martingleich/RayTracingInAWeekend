@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 mod aabb;
+mod background_color;
 mod camera;
 mod color;
 mod hittable;
@@ -14,6 +15,7 @@ mod worlds;
 
 use std::{path::Path, sync::mpsc, thread};
 
+use background_color::BackgroundColor;
 use color::Color;
 use hittable::Hittable;
 
@@ -23,19 +25,18 @@ use rand::{distributions::Uniform, Rng, SeedableRng};
 use ray::Ray;
 use size2i::Size2i;
 use vec2::Vec2f;
-use vec3::Dir3;
 use worlds::World;
 
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
-    let image_size = Size2i::new(400, 225);
-    let samples_per_pixel = 1000;
+    let image_size = Size2i::new(800, 600);
+    let samples_per_pixel = 100;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_earth_mapped(image_size.aspect_ratio(), &mut arena);
+    let world = worlds::create_world_simple_plane(image_size.aspect_ratio(), &mut arena);
 
     let pixels = render(
         image_size,
@@ -56,38 +57,37 @@ fn main() -> Result<(), ImageError> {
     )
 }
 
-fn sky_color(ray: &Ray) -> Color {
-    let t = 0.5 * (Dir3::dot(Dir3::UP, ray.direction) + 1.0);
-    let ground_color = Color::new_rgb(0.5, 0.7, 1.0);
-    let sky_color = Color::new_rgb(1.0, 1.0, 1.0);
-    math::lerp(sky_color, ground_color, t)
-}
-
 fn ray_color<THit: Hittable, TRng: rand::Rng>(
     ray: &Ray,
     world: &THit,
+    background_color: &BackgroundColor,
     rng: &mut TRng,
     max_depth: i32,
 ) -> Color {
     let mut depth = max_depth;
     let mut attentuation: Color = Color::WHITE;
+    let mut emitted: Color = Color::BLACK;
     let mut cur_ray = *ray;
     loop {
         if let Some(interaction) = world.hit(&cur_ray, &(0.0001..f32::INFINITY)) {
             if depth <= 1 {
                 return Color::BLACK;
-            } else if let Some((attentuation2, scattered)) =
+            } else if let Some((new_attentuation, scattered)) =
                 interaction.material.scatter(&cur_ray, &interaction, rng)
             {
-                attentuation = Color::convolution(attentuation, attentuation2);
+                let emitted_new = interaction.material.emit(&interaction);
+                attentuation = Color::convolution(attentuation, new_attentuation);
+                emitted += Color::convolution(attentuation, emitted_new);
                 cur_ray = scattered;
                 depth -= 1;
                 continue;
             } else {
-                return Color::BLACK;
+                let emitted_new = interaction.material.emit(&interaction);
+                return Color::convolution(attentuation, emitted_new);
             }
         } else {
-            return Color::convolution(attentuation, sky_color(ray));
+            let background_color = background_color.sample(ray);
+            return emitted + Color::convolution(attentuation, background_color);
         }
     }
 }
@@ -147,7 +147,13 @@ fn render<T: Hittable>(
                             .map(|_| {
                                 let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
                                 let ray = world.camera.ray(&mut sub_rng, pix);
-                                ray_color(&ray, &world.hittable, &mut sub_rng, max_depth)
+                                ray_color(
+                                    &ray,
+                                    &world.hittable,
+                                    &world.background,
+                                    &mut sub_rng,
+                                    max_depth,
+                                )
                             })
                             .sum::<Color>()
                             / real_samples_per_pixel as f32

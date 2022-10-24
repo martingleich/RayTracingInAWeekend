@@ -2,8 +2,9 @@ use rand::{Rng, SeedableRng};
 
 use crate::camera::Camera;
 use crate::color::Color;
-use crate::hittable::{Hittable, HittableList, MovingHittable, Sphere};
+use crate::hittable::{Hittable, HittableList, MovingHittable, Rect, Sphere};
 
+use crate::background_color::BackgroundColor;
 use crate::material::Material;
 use crate::texture::Texture;
 use crate::vec3::{Dir3, Point3};
@@ -11,12 +12,48 @@ use crate::vec3::{Dir3, Point3};
 pub struct World<T: Hittable> {
     pub camera: Camera,
     pub hittable: T,
+    pub background: BackgroundColor,
 }
 
-pub fn create_world_earth_mapped(
+pub fn create_world_simple_plane(
     aspect_ratio: f32,
     arena: &mut bumpalo::Bump,
-) -> World<Sphere> {
+) -> World<HittableList<Rect>> {
+    // A single rectangle with a solid
+    let camera = Camera::build()
+        .vertical_fov(60.0, aspect_ratio)
+        .position(Point3::new(0.0, 6.0, 10.0))
+        .look_at(Dir3::UP, Point3::ORIGIN)
+        .build();
+
+    let tex_white = arena.alloc(Texture::Solid {
+        color: 100.0 * Color::new_rgb(1.0, 1.0, 1.0),
+    });
+    let tex_blue = arena.alloc(Texture::Solid {
+        color: Color::new_rgb(0.0, 0.0, 0.4),
+    });
+    let mat_emit = arena.alloc(Material::DiffuseLight { emit: tex_white });
+    let mat_floor = arena.alloc(Material::Lambert { albedo: tex_blue });
+
+    let hittable = {
+        let mut list = HittableList::new();
+        list.push(Rect::new_xy(Point3::new(0.0, 2.0, 0.0), 1.0, 1.0, mat_emit));
+
+        list.push(Rect::new_xz(Point3::ORIGIN, 10.0, 10.0, mat_floor));
+
+        list
+    };
+
+    World {
+        camera,
+        hittable,
+        background: BackgroundColor::Solid {
+            color: Color::new_rgb(0.1, 0.1, 0.1),
+        },
+    }
+}
+
+pub fn create_world_earth_mapped(aspect_ratio: f32, arena: &mut bumpalo::Bump) -> World<Sphere> {
     // A single sphere with a image texture
     let camera = Camera::build()
         .vertical_fov(60.0, aspect_ratio)
@@ -29,12 +66,18 @@ pub fn create_world_earth_mapped(
     let reader = std::io::BufReader::new(file);
     let image = arena.alloc(image::load(reader, image::ImageFormat::Jpeg).unwrap());
 
-    let tex_earth = arena.alloc(Texture::Image { image: image.as_rgb8().unwrap() });
+    let tex_earth = arena.alloc(Texture::Image {
+        image: image.as_rgb8().unwrap(),
+    });
     let mat_earth = arena.alloc(Material::Lambert { albedo: tex_earth });
 
     let hittable = Sphere::new(Point3::ORIGIN, 2.0, mat_earth);
 
-    World { camera, hittable }
+    World {
+        camera,
+        hittable,
+        background: BackgroundColor::Sky,
+    }
 }
 
 pub fn create_world_moving_spheres<'a>(
@@ -95,7 +138,11 @@ pub fn create_world_moving_spheres<'a>(
         world
     };
 
-    World { camera, hittable }
+    World {
+        camera,
+        hittable,
+        background: BackgroundColor::Sky,
+    }
 }
 
 pub fn create_world_random_scene(
@@ -175,7 +222,11 @@ pub fn create_world_random_scene(
         world
     };
 
-    World { camera, hittable }
+    World {
+        camera,
+        hittable,
+        background: BackgroundColor::Sky,
+    }
 }
 
 pub fn create_world_defocus_blur(
@@ -243,5 +294,9 @@ pub fn create_world_defocus_blur(
         world
     };
 
-    World { camera, hittable }
+    World {
+        camera,
+        hittable,
+        background: BackgroundColor::Sky,
+    }
 }

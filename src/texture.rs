@@ -11,7 +11,7 @@ pub enum Texture<'a> {
         odd: &'a Texture<'a>,
     },
     Image {
-        image : &'a image::RgbImage,
+        image: &'a image::RgbImage,
     },
 }
 
@@ -30,11 +30,13 @@ impl<'a> Texture<'a> {
                 t.sample(interaction)
             }
             Texture::Image { image } => {
-                let pix_u = ((interaction.uv.x * image.width() as f32) as u32).min(image.width() - 1);
-                let pix_v = ((interaction.uv.y * image.height() as f32) as u32).min(image.height() - 1);
+                let pix_u =
+                    ((interaction.uv.x * image.width() as f32) as u32).min(image.width() - 1);
+                let pix_v =
+                    ((interaction.uv.y * image.height() as f32) as u32).min(image.height() - 1);
 
                 Color::new_rgb8(image.get_pixel(pix_u, pix_v).0)
-            },
+            }
         }
     }
 }
