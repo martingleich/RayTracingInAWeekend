@@ -5,12 +5,12 @@ use crate::{
     vec3::{Dir3, Point3},
 };
 #[derive(Clone, Copy, PartialEq)]
-pub struct AABB {
+pub struct Aabb {
     pub min: Point3,
     pub max: Point3,
 }
 
-impl AABB {
+impl Aabb {
     pub fn new_corners(min: Point3, max: Point3) -> Self {
         Self { min, max }
     }
@@ -20,7 +20,7 @@ impl AABB {
             center + Dir3::new(radius, radius, radius),
         )
     }
-    pub fn new_surrounding(a: &AABB, b: &AABB) -> Self {
+    pub fn new_surrounding(a: &Aabb, b: &Aabb) -> Self {
         Self::new_corners(
             Point3::new(
                 a.min.0.e[0].min(b.min.0.e[0]),
@@ -47,7 +47,7 @@ impl AABB {
                 return false;
             }
         }
-        return true;
+        true
     }
     fn minmax(a: f32, b: f32) -> (f32, f32) {
         if a < b {
@@ -57,7 +57,7 @@ impl AABB {
         }
     }
 
-    pub fn translate(&self, offset: Dir3) -> AABB {
+    pub fn translate(&self, offset: Dir3) -> Aabb {
         Self::new_corners(self.min + offset, self.max + offset)
     }
 }

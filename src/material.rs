@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::hittable::HitInteraction;
 use crate::{color::Color, texture::Texture};
 

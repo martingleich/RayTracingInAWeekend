@@ -1,7 +1,7 @@
-use std::{ops::Range};
+use std::ops::Range;
 
 use crate::{
-    aabb::AABB,
+    aabb::Aabb,
     ray::Ray,
     vec2::Vec2f,
     vec3::{Dir3, Point3},
@@ -44,9 +44,9 @@ impl<'a> HitInteraction<'a> {
     }
 }
 
-pub trait Hittable : Send+Sync {
+pub trait Hittable: Send + Sync {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction>;
-    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB>;
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,8 +108,8 @@ impl<'a> Hittable for Sphere<'a> {
         }
     }
 
-    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<AABB> {
-        Some(AABB::new_radius(self.center, self.radius))
+    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
+        Some(Aabb::new_radius(self.center, self.radius))
     }
 }
 
@@ -132,7 +132,7 @@ impl<T: Hittable> Hittable for MovingHittable<T> {
         self.hittable.hit(&moved_ray, t_range)
     }
 
-    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB> {
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
         let start_box = self
             .hittable
             .bounding_box(&(time_range.start..time_range.start))?
@@ -141,7 +141,7 @@ impl<T: Hittable> Hittable for MovingHittable<T> {
             .hittable
             .bounding_box(&(time_range.end..time_range.end))?
             .translate(self.velocity * time_range.end);
-        Some(AABB::new_surrounding(&start_box, &end_box))
+        Some(Aabb::new_surrounding(&start_box, &end_box))
     }
 }
 
@@ -165,7 +165,7 @@ impl Hittable for Box<dyn Hittable + '_> {
         self.as_ref().hit(ray, t_range)
     }
 
-    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB> {
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
         self.as_ref().bounding_box(time_range)
     }
 }
@@ -183,15 +183,15 @@ impl<T: Hittable> Hittable for HittableList<T> {
         min_interaction
     }
 
-    fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB> {
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
         // If any child is None -> None
         // Empty list -> None
         // else reduce(AABB::new_surounding)
-        let mut result: Option<AABB> = None;
+        let mut result: Option<Aabb> = None;
         for hittable in &self.hittables {
             if let Some(aabb) = &hittable.bounding_box(time_range) {
                 if let Some(old) = &result {
-                    result = Some(AABB::new_surrounding(old, aabb))
+                    result = Some(Aabb::new_surrounding(old, aabb))
                 } else {
                     result = Some(*aabb);
                 }
@@ -206,7 +206,7 @@ impl<T: Hittable> Hittable for HittableList<T> {
 struct BoundingVolumeHierarchy {
     left: Box<dyn Hittable>,
     right: Option<Box<dyn Hittable>>,
-    aabb: AABB,
+    aabb: Aabb,
 }
 
 impl BoundingVolumeHierarchy {
@@ -225,7 +225,7 @@ impl BoundingVolumeHierarchy {
     }
 
     fn new_inner(
-        mut hittables: Vec<(Box<dyn Hittable>, AABB)>,
+        mut hittables: Vec<(Box<dyn Hittable>, Aabb)>,
         axis_id: usize,
     ) -> BoundingVolumeHierarchy {
         if hittables.len() == 1 {
@@ -237,13 +237,13 @@ impl BoundingVolumeHierarchy {
             }
         } else {
             let comparer =
-                |a: &AABB, b: &AABB| a.min.0.e[axis_id].partial_cmp(&b.min.0.e[axis_id]).unwrap();
+                |a: &Aabb, b: &Aabb| a.min.0.e[axis_id].partial_cmp(&b.min.0.e[axis_id]).unwrap();
             hittables.sort_by(|a, b| comparer(&a.1, &b.1));
             if hittables.len() == 2 {
                 let (left_hittable, left_box) = hittables.pop().unwrap();
                 let (right_hittable, right_box) = hittables.pop().unwrap();
                 Self {
-                    aabb: AABB::new_surrounding(&left_box, &right_box),
+                    aabb: Aabb::new_surrounding(&left_box, &right_box),
                     left: left_hittable,
                     right: Some(right_hittable),
                 }
@@ -256,8 +256,8 @@ impl BoundingVolumeHierarchy {
                 let left = Box::new(Self::new_inner(hittables, (axis_id + 1) % 3));
                 let right = Box::new(Self::new_inner(right_half, (axis_id + 1) % 3));
                 Self {
-                    aabb: AABB::new_surrounding(&left.aabb, &right.aabb),
-                    left: left,
+                    aabb: Aabb::new_surrounding(&left.aabb, &right.aabb),
+                    left,
                     right: Some(right),
                 }
             }
@@ -286,7 +286,7 @@ impl Hittable for BoundingVolumeHierarchy {
         }
     }
 
-    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<AABB> {
+    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
         Some(self.aabb)
     }
 }

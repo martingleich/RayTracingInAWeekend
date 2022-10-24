@@ -9,7 +9,7 @@
 			],
 			"group": "build",
 			"label": "rust: cargo build",
-			"dependsOn": ["rust: cargo fmt", "rust: cargo clippy"]
+			"dependsOn": ["rust: cargo fmt", "rust: cargo clippy"],
 		},
 		{
 			"type": "cargo",
