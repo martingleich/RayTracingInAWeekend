@@ -55,7 +55,7 @@ impl<'a> Material<'a> {
                 let sin_theta = f32::sqrt(1.0 - cos_theta * cos_theta);
                 let cannot_refract = refraction_ratio * sin_theta > 1.0;
                 let direction = if cannot_refract
-                    || (Self::reflectance(cos_theta, refraction_ratio) > rng.gen::<f32>())
+                    || (reflectance(cos_theta, refraction_ratio) > rng.gen::<f32>())
                 {
                     Dir3::reflect(ray.direction, interaction.normal)
                 } else {
@@ -67,9 +67,11 @@ impl<'a> Material<'a> {
         }
     }
 
-    fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
-        let r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
-        let rs = r0 * r0;
-        rs + (1.0 - rs) * (1.0 - cosine).powi(5)
-    }
+}
+
+
+fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
+    let r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
+    let rs = r0 * r0;
+    rs + (1.0 - rs) * (1.0 - cosine).powi(5)
 }
