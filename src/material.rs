@@ -1,19 +1,21 @@
-use crate::color::Color;
+use std::rc::Rc;
+
 use crate::hittable::HitInteraction;
+use crate::{color::Color, texture::Texture};
 
 use crate::ray::Ray;
 use crate::vec3::Dir3;
 use rand::Rng;
 use rand_distr::{Distribution, UnitBall, UnitSphere};
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Material {
-    Lambert { albedo: Color },
-    Metal { albedo: Color, fuzz: f32 },
+#[derive(Debug, PartialEq, Clone)]
+pub enum Material<'a> {
+    Lambert { albedo: &'a Texture<'a> },
+    Metal { albedo: &'a Texture<'a>, fuzz: f32 },
     Dielectric { index_of_refraction: f32 },
 }
 
-impl Material {
+impl<'a> Material<'a> {
     pub fn scatter<TRng: Rng>(
         &self,
         ray: &Ray,
@@ -25,7 +27,8 @@ impl Material {
                 let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng)))
                     .unit_or_else(interaction.normal);
                 let scattered = Ray::new(interaction.position, direction, ray.time);
-                Some((albedo, scattered))
+                let color = albedo.sample(interaction);
+                Some((color, scattered))
             }
             Material::Metal { albedo, fuzz } => {
                 let fuzz_dir = if fuzz > 0.0 {
@@ -36,7 +39,8 @@ impl Material {
                 let direction = Dir3::reflect(ray.direction, interaction.normal) + fuzz_dir;
                 if Dir3::dot(direction, interaction.normal) > 0.0 {
                     let scattered = Ray::new(interaction.position, direction.unit(), ray.time);
-                    Some((albedo, scattered))
+                    let color = albedo.sample(interaction);
+                    Some((color, scattered))
                 } else {
                     None
                 }

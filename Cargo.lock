@@ -496,6 +496,7 @@ dependencies = [
 name = "ray_tracing_in_a_weekend"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "derive_more",
  "image",
  "rand",

@@ -1,28 +1,31 @@
-use std::ops::Range;
+use std::{ops::Range};
 
 use crate::{
     aabb::AABB,
     ray::Ray,
+    vec2::Vec2f,
     vec3::{Dir3, Point3},
     Material,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HitInteraction {
+#[derive(Debug, Clone, PartialEq)]
+pub struct HitInteraction<'a> {
     pub position: Point3,
     pub normal: Dir3,
+    pub uv: Vec2f,
     pub t: f32,
     pub front_face: bool,
-    pub material: Material,
+    pub material: &'a Material<'a>,
 }
 
-impl HitInteraction {
+impl<'a> HitInteraction<'a> {
     pub fn new_from_ray(
         ray: &Ray,
         position: &Point3,
         surface_normal: &Dir3,
         t: f32,
-        material: &Material,
+        material: &'a Material,
+        uv: Vec2f,
     ) -> Self {
         let front_face = Dir3::dot(*surface_normal, ray.direction) < 0.0;
         let normal = if front_face {
@@ -35,25 +38,26 @@ impl HitInteraction {
             normal,
             t,
             front_face,
-            material: *material,
+            material,
+            uv,
         }
     }
 }
 
-pub trait Hittable: Send + Sync {
+pub trait Hittable : Send+Sync {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction>;
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<AABB>;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Sphere {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sphere<'a> {
     pub center: Point3,
     pub radius: f32,
-    pub material: Material,
+    pub material: &'a Material<'a>,
 }
 
-impl Sphere {
-    pub fn new(center: Point3, radius: f32, material: Material) -> Self {
+impl<'a> Sphere<'a> {
+    pub fn new(center: Point3, radius: f32, material: &'a Material) -> Self {
         Self {
             center,
             radius,
@@ -62,7 +66,13 @@ impl Sphere {
     }
 }
 
-impl Hittable for Sphere {
+fn get_sphere_uv(pos: Dir3) -> Vec2f {
+    let theta = pos.0.e[1].acos();
+    let phi = f32::atan2(-pos.0.e[2], pos.0.e[0]) + std::f32::consts::PI;
+    Vec2f::new(phi / std::f32::consts::TAU, theta / std::f32::consts::PI)
+}
+
+impl<'a> Hittable for Sphere<'a> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         let oc = ray.origin - self.center;
         let half_b = Dir3::dot(oc, ray.direction);
@@ -86,12 +96,14 @@ impl Hittable for Sphere {
             }
             let position = ray.at(root);
             let surface_normal = (position - self.center) / self.radius;
+            let uv = get_sphere_uv(surface_normal);
             Some(HitInteraction::new_from_ray(
                 ray,
                 &position,
                 &surface_normal,
                 root,
-                &self.material,
+                self.material,
+                uv,
             ))
         }
     }
@@ -148,7 +160,7 @@ impl<T: Hittable> HittableList<T> {
     }
 }
 
-impl Hittable for Box<dyn Hittable> {
+impl Hittable for Box<dyn Hittable + '_> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         self.as_ref().hit(ray, t_range)
     }
@@ -198,9 +210,17 @@ struct BoundingVolumeHierarchy {
 }
 
 impl BoundingVolumeHierarchy {
-    pub fn new(hittables : Vec<Box<dyn Hittable>>, time_range: &Range<f32>) -> BoundingVolumeHierarchy
-    {
-        let hittables = hittables.into_iter().map(|h| { let aabb = h.bounding_box(time_range).unwrap(); (h, aabb)}).collect::<Vec<_>>();
+    pub fn new(
+        hittables: Vec<Box<dyn Hittable>>,
+        time_range: &Range<f32>,
+    ) -> BoundingVolumeHierarchy {
+        let hittables = hittables
+            .into_iter()
+            .map(|h| {
+                let aabb = h.bounding_box(time_range).unwrap();
+                (h, aabb)
+            })
+            .collect::<Vec<_>>();
         Self::new_inner(hittables, 0)
     }
 

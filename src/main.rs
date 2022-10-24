@@ -6,13 +6,13 @@ mod material;
 mod math;
 mod ray;
 mod size2i;
+mod texture;
 mod vec2;
 mod vec3;
 mod worlds;
 
 use std::{path::Path, sync::mpsc, thread};
 
-use camera::Camera;
 use color::Color;
 use hittable::Hittable;
 
@@ -23,23 +23,24 @@ use ray::Ray;
 use size2i::Size2i;
 use vec2::Vec2f;
 use vec3::Dir3;
+use worlds::World;
 
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
     let image_size = Size2i::new(400, 225);
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 1000;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
-    let (camera, world) = worlds::create_world_moving_spheres(image_size.aspect_ratio());
+    let mut arena = bumpalo::Bump::new();
+    let world = worlds::create_world_moving_spheres(image_size.aspect_ratio(), &mut arena);
 
     let pixels = render(
         image_size,
         thread_count,
         samples_per_pixel,
         max_depth,
-        &camera,
         &world,
     );
 
@@ -95,8 +96,7 @@ fn render<T: Hittable>(
     thread_count: usize,
     samples_per_pixel: usize,
     max_depth: i32,
-    camera: &Camera,
-    world: &T,
+    world: &World<T>,
 ) -> Vec<Color> {
     eprintln!("Start rendering...");
     let start_time = std::time::Instant::now();
@@ -145,8 +145,8 @@ fn render<T: Hittable>(
                         (0..real_samples_per_pixel)
                             .map(|_| {
                                 let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
-                                let ray = camera.ray(&mut sub_rng, pix);
-                                ray_color(&ray, world, &mut sub_rng, max_depth)
+                                let ray = world.camera.ray(&mut sub_rng, pix);
+                                ray_color(&ray, &world.hittable, &mut sub_rng, max_depth)
                             })
                             .sum::<Color>()
                             / real_samples_per_pixel as f32
