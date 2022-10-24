@@ -10,6 +10,9 @@ pub enum Texture<'a> {
         even: &'a Texture<'a>,
         odd: &'a Texture<'a>,
     },
+    Image {
+        image : &'a image::RgbImage,
+    },
 }
 
 impl<'a> Texture<'a> {
@@ -26,6 +29,12 @@ impl<'a> Texture<'a> {
                 let t = if sines < 0.0 { even } else { odd };
                 t.sample(interaction)
             }
+            Texture::Image { image } => {
+                let pix_u = ((interaction.uv.x * image.width() as f32) as u32).min(image.width() - 1);
+                let pix_v = ((interaction.uv.y * image.height() as f32) as u32).min(image.height() - 1);
+
+                Color::new_rgb8(image.get_pixel(pix_u, pix_v).0)
+            },
         }
     }
 }

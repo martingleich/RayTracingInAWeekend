@@ -26,6 +26,9 @@ impl Color {
     pub fn new_rgb_arr(c: [f32; 3]) -> Self {
         Self::new_rgb(c[0], c[1], c[2])
     }
+    pub fn new_rgb8(c : [u8; 3]) -> Self {
+        Self(Vec3::new(c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0))
+    }
     pub fn to_rgb8(self) -> [u8; 3] {
         let ir = math::clamp(0.0, 255.0, self.0.e[0] * 256.0) as u8;
         let ig = math::clamp(0.0, 255.0, self.0.e[1] * 256.0) as u8;

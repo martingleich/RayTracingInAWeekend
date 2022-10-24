@@ -13,6 +13,30 @@ pub struct World<T: Hittable> {
     pub hittable: T,
 }
 
+pub fn create_world_earth_mapped(
+    aspect_ratio: f32,
+    arena: &mut bumpalo::Bump,
+) -> World<Sphere> {
+    // A single sphere with a image texture
+    let camera = Camera::build()
+        .vertical_fov(60.0, aspect_ratio)
+        .position(Point3::new(0.0, 2.0, 10.0))
+        .look_at(Dir3::UP, Point3::ORIGIN)
+        .build();
+
+    let path = std::path::Path::new("input/earthmap.jpg");
+    let file = std::fs::OpenOptions::new().read(true).open(path).unwrap();
+    let reader = std::io::BufReader::new(file);
+    let image = arena.alloc(image::load(reader, image::ImageFormat::Jpeg).unwrap());
+
+    let tex_earth = arena.alloc(Texture::Image { image: image.as_rgb8().unwrap() });
+    let mat_earth = arena.alloc(Material::Lambert { albedo: tex_earth });
+
+    let hittable = Sphere::new(Point3::ORIGIN, 2.0, mat_earth);
+
+    World { camera, hittable }
+}
+
 pub fn create_world_moving_spheres<'a>(
     aspect_ratio: f32,
     arena: &'a mut bumpalo::Bump,

@@ -35,7 +35,7 @@ fn main() -> Result<(), ImageError> {
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_moving_spheres(image_size.aspect_ratio(), &mut arena);
+    let world = worlds::create_world_earth_mapped(image_size.aspect_ratio(), &mut arena);
 
     let pixels = render(
         image_size,
