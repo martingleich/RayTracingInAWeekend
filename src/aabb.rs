@@ -28,8 +28,7 @@ impl Aabb {
             min = math::min_array(min, b.min.0.e);
             max = math::max_array(max, b.max.0.e);
         }
-        Self
-        {
+        Self {
             min: Point3::new_from_arr(min),
             max: Point3::new_from_arr(max),
         }
@@ -41,8 +40,7 @@ impl Aabb {
             min = math::min_array(min, p.0.e);
             max = math::max_array(max, p.0.e);
         }
-        Self
-        {
+        Self {
             min: Point3::new_from_arr(min),
             max: Point3::new_from_arr(max),
         }

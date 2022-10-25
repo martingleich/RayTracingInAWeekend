@@ -2,10 +2,12 @@ use std::ops::Range;
 
 use crate::{
     aabb::Aabb,
+    math,
     ray::Ray,
+    transformations::Transformation,
     vec2::Vec2f,
     vec3::{Dir3, Point3},
-    Material, transformations::Transformation,
+    Material,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,7 +98,7 @@ impl<'a> Hittable for Sphere<'a> {
             let position = ray.at(root);
             let surface_normal = (position - self.center) / self.radius;
             let uv = get_sphere_uv(surface_normal);
-            
+
             Some(HitInteraction::new_from_ray(
                 ray,
                 &position,
@@ -113,41 +115,44 @@ impl<'a> Hittable for Sphere<'a> {
     }
 }
 
+pub enum RectPlane {
+    Xy,
+    Xz,
+    Yz,
+}
 pub struct Rect<'a> {
-    corner: Point3,
-    axis_right: Dir3,
-    axis_up: Dir3,
+    rect_plane: RectPlane,
+    dist: f32,
+    r1: Range<f32>,
+    r2: Range<f32>,
     material: &'a Material<'a>,
 }
 
 impl<'a> Rect<'a> {
     pub fn new_xy(center: Point3, width: f32, height: f32, material: &'a Material<'a>) -> Self {
-        let axis_right = Dir3::RIGHT * width;
-        let axis_up = Dir3::UP * height;
         Self {
-            corner: center - 0.5 * (axis_right + axis_up),
-            axis_right,
-            axis_up,
+            rect_plane: RectPlane::Xy,
+            dist: center.0.e[2],
+            r1: (center.0.e[0] - width * 0.5)..(center.0.e[0] + width * 0.5),
+            r2: (center.0.e[1] - height * 0.5)..(center.0.e[1] + height * 0.5),
             material,
         }
     }
     pub fn new_xz(center: Point3, width: f32, depth: f32, material: &'a Material<'a>) -> Self {
-        let axis_right = Dir3::RIGHT * width;
-        let axis_up = Dir3::FORWARD * depth;
         Self {
-            corner: center - 0.5 * (axis_right + axis_up),
-            axis_right,
-            axis_up,
+            rect_plane: RectPlane::Xz,
+            dist: center.0.e[1],
+            r1: (center.0.e[0] - width * 0.5)..(center.0.e[0] + width * 0.5),
+            r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
             material,
         }
     }
     pub fn new_yz(center: Point3, height: f32, depth: f32, material: &'a Material<'a>) -> Self {
-        let axis_right = Dir3::UP * height;
-        let axis_up = Dir3::FORWARD * depth;
         Self {
-            corner: center - 0.5 * (axis_right + axis_up),
-            axis_right,
-            axis_up,
+            rect_plane: RectPlane::Yz,
+            dist: center.0.e[0],
+            r1: (center.0.e[1] - height * 0.5)..(center.0.e[1] + height * 0.5),
+            r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
             material,
         }
     }
@@ -155,41 +160,36 @@ impl<'a> Rect<'a> {
 
 impl<'a> Hittable for Rect<'a> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
-        let normal = Dir3::cross(self.axis_right, self.axis_up).unit();
-        let denom = Dir3::dot(ray.direction, normal);
-        if denom.abs() > 0.0001 {
-            let t = Dir3::dot(normal, self.corner - ray.origin) / denom;
-            if t_range.contains(&t) {
-                let position = ray.at(t);
-                let q = position - self.corner;
-                let v_temp = Dir3::cross(normal, self.axis_up);
-                let x = Dir3::dot(q, v_temp) / Dir3::dot(self.axis_right, v_temp);
-                if (0.0..1.0).contains(&x) {
-                    let v_temp = Dir3::cross(normal, self.axis_right);
-                    let y = Dir3::dot(q, v_temp) / Dir3::dot(self.axis_up, v_temp);
-                    if (0.0..1.0).contains(&y) {
-                        let uv = Vec2f::new(x, y);
-                        return Some(HitInteraction::new_from_ray(
-                            ray,
-                            &position,
-                            &normal,
-                            t,
-                            self.material,
-                            uv,
-                        ));
-                    }
-                }
-            };
+        let (p0, p1, n) = match self.rect_plane {
+            RectPlane::Xy => (0, 1, 2),
+            RectPlane::Xz => (0, 2, 1),
+            RectPlane::Yz => (1, 2, 0),
         };
+        let t = (self.dist - ray.origin.0.e[n]) / ray.direction.0.e[n];
+        if t_range.contains(&t) {
+            let position = ray.origin + t * ray.direction;
+            if self.r1.contains(&position.0.e[p0]) && self.r2.contains(&position.0.e[p1]) {
+                let uv = Vec2f::new(
+                    (position.0.e[p0] - self.r1.start) / (self.r1.end - self.r1.start),
+                    (position.0.e[p1] - self.r2.start) / (self.r1.end - self.r2.start),
+                );
+                let mut surface_normal = Dir3::ZERO;
+                surface_normal.0.e[n] = 1.0;
+                return Some(HitInteraction::new_from_ray(
+                    ray,
+                    &position,
+                    &surface_normal,
+                    t,
+                    self.material,
+                    uv,
+                ));
+            }
+        }
         None
     }
 
     fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
-        let p1 = self.corner;
-        let p2 = self.corner + self.axis_right;
-        let p3 = self.corner + self.axis_up;
-        let p4 = self.corner + self.axis_right + self.axis_up;
-        Some(Aabb::new_surrounding_points(&[p1, p2, p3, p4]))
+        None
     }
 }
 
@@ -228,13 +228,81 @@ impl<'a, T: Hittable> Hittable for MovingHittable<'a, T> {
     }
 }
 
-
-pub struct TransformedHittable<'a, THit: Hittable, TTrans : Transformation> {
-    pub hittable: &'a THit,
-    pub transformation : TTrans,
+pub struct AxisAlignedBox<'a> {
+    aabb: Aabb,
+    material: &'a Material<'a>,
 }
 
-impl<'a, THit: Hittable, TTrans : Transformation> Hittable for TransformedHittable<'a, THit, TTrans> {
+impl<'a> AxisAlignedBox<'a> {
+    pub fn new(aabb: &Aabb, material: &'a Material<'a>) -> Self {
+        Self {
+            aabb: *aabb,
+            material,
+        }
+    }
+}
+
+impl<'a> Hittable for AxisAlignedBox<'a> {
+    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+        let mut min_t = f32::INFINITY;
+        let mut uv = Vec2f::ZERO;
+        let mut surface_normal = Dir3::ZERO;
+        for p in 0..3 {
+            let (p0, p1, n) = match p {
+                0 => (0, 1, 2),
+                1 => (0, 2, 1),
+                2 => (1, 2, 0),
+                _ => panic!(),
+            };
+            let min_dist = (self.aabb.min.0.e[n] - ray.origin.0.e[n]) / ray.direction.0.e[n];
+            let max_dist = (self.aabb.max.0.e[n] - ray.origin.0.e[n]) / ray.direction.0.e[n];
+            let (t, t1) = math::minmax(min_dist, max_dist);
+            let t_min = t.max(t_range.start);
+            let t_max = t1.min(t_range.end);
+            if t_max <= t_min {
+                return None;
+            }
+            if t < min_t && t_range.contains(&t) {
+                let r0 = self.aabb.min.0.e[p0]..self.aabb.max.0.e[p0];
+                let r1 = self.aabb.min.0.e[p1]..self.aabb.max.0.e[p1];
+                let position = ray.origin + t * ray.direction;
+                if r0.contains(&position.0.e[p0]) && r1.contains(&position.0.e[p1]) {
+                    min_t = t;
+                    uv = Vec2f::new(
+                        (position.0.e[p0] - r0.start) / (r0.end - r0.start),
+                        (position.0.e[p1] - r1.start) / (r0.end - r1.start),
+                    );
+                    surface_normal = Dir3::ZERO;
+                    surface_normal.0.e[n] = 1.0;
+                }
+            }
+        }
+        if min_t != f32::INFINITY {
+            return Some(HitInteraction::new_from_ray(
+                ray,
+                &ray.at(min_t),
+                &surface_normal,
+                min_t,
+                self.material,
+                uv,
+            ));
+        }
+        None
+    }
+
+    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
+        Some(self.aabb)
+    }
+}
+
+pub struct TransformedHittable<'a, THit: Hittable, TTrans: Transformation> {
+    pub hittable: &'a THit,
+    pub transformation: TTrans,
+}
+
+impl<'a, THit: Hittable, TTrans: Transformation> Hittable
+    for TransformedHittable<'a, THit, TTrans>
+{
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
@@ -255,71 +323,6 @@ impl<'a, THit: Hittable, TTrans : Transformation> Hittable for TransformedHittab
             }
             Aabb::new_surrounding_points(&corners)
         })
-    }
-}
-
-pub struct AxisAlignedBox<'a> {
-    aabb: Aabb,
-    sides: HittableList<Rect<'a>>,
-}
-
-impl<'a> AxisAlignedBox<'a> {
-    pub fn new(aabb: &Aabb, material: &'a Material<'a>) -> Self {
-        let sides = {
-            let mut sides = HittableList::new();
-            sides.push(Rect {
-                corner: aabb.min,
-                axis_right: aabb.right(),
-                axis_up: aabb.up(),
-                material,
-            });
-            sides.push(Rect {
-                corner: aabb.min,
-                axis_right: aabb.forward(),
-                axis_up: aabb.up(),
-                material,
-            });
-            sides.push(Rect {
-                corner: aabb.min,
-                axis_right: aabb.forward(),
-                axis_up: aabb.right(),
-                material,
-            });
-            sides.push(Rect {
-                corner: aabb.max,
-                axis_right: -aabb.right(),
-                axis_up: -aabb.up(),
-                material,
-            });
-            sides.push(Rect {
-                corner: aabb.max,
-                axis_right: -aabb.forward(),
-                axis_up: -aabb.up(),
-                material,
-            });
-            sides.push(Rect {
-                corner: aabb.max,
-                axis_right: -aabb.forward(),
-                axis_up: -aabb.right(),
-                material,
-            });
-            sides
-        };
-        Self { aabb: *aabb, sides }
-    }
-}
-
-impl<'a> Hittable for AxisAlignedBox<'a> {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
-        if self.aabb.hit(ray, t_range) {
-            self.sides.hit(ray, t_range)
-        } else {
-            None
-        }
-    }
-
-    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
-        Some(self.aabb)
     }
 }
 

@@ -121,23 +121,39 @@ impl Point3 {
     }
     pub const ORIGIN: Self = Self(Vec3 { e: [0.0, 0.0, 0.0] });
 
-    pub fn right(self) -> f32 { self.0.e[0] }
-    pub fn up(self) -> f32 { self.0.e[1] }
-    pub fn forward(self) -> f32 { self.0.e[2] }
-    pub fn components(self) -> [f32;3] { self.0.e }
+    pub fn right(self) -> f32 {
+        self.0.e[0]
+    }
+    pub fn up(self) -> f32 {
+        self.0.e[1]
+    }
+    pub fn forward(self) -> f32 {
+        self.0.e[2]
+    }
+    pub fn components(self) -> [f32; 3] {
+        self.0.e
+    }
 }
 
 impl Dir3 {
-    pub fn new(right : f32, up: f32, forward: f32) -> Self {
-        Self(Vec3 { e: [right, up, forward] })
+    pub fn new(right: f32, up: f32, forward: f32) -> Self {
+        Self(Vec3 {
+            e: [right, up, forward],
+        })
     }
     pub fn new_from_arr(c: [f32; 3]) -> Self {
         Self::new(c[0], c[1], c[2])
     }
-  
-    pub fn right(self) -> f32 { self.0.e[0] }
-    pub fn up(self) -> f32 { self.0.e[1] }
-    pub fn forward(self) -> f32 { self.0.e[2] }
+
+    pub fn right(self) -> f32 {
+        self.0.e[0]
+    }
+    pub fn up(self) -> f32 {
+        self.0.e[1]
+    }
+    pub fn forward(self) -> f32 {
+        self.0.e[2]
+    }
 
     pub const ZERO: Self = Self(Vec3 { e: [0.0, 0.0, 0.0] });
     pub const RIGHT: Self = Self(Vec3 { e: [1.0, 0.0, 0.0] });
@@ -214,7 +230,11 @@ impl Dir3 {
     pub fn to_radian(self) -> (f32, f32, f32) {
         let theta = self.0.e[1].acos();
         let phi = f32::atan2(-self.0.e[2], self.0.e[0]) + std::f32::consts::PI;
-        (phi / std::f32::consts::TAU, theta / std::f32::consts::PI, self.length())
+        (
+            phi / std::f32::consts::TAU,
+            theta / std::f32::consts::PI,
+            self.length(),
+        )
     }
 }
 

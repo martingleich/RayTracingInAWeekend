@@ -9,10 +9,10 @@ mod math;
 mod ray;
 mod size2i;
 mod texture;
+mod transformations;
 mod vec2;
 mod vec3;
 mod worlds;
-mod transformations;
 
 use std::{path::Path, sync::mpsc, thread};
 
@@ -31,7 +31,7 @@ use worlds::World;
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
     let image_size = Size2i::new(800, 800);
-    let samples_per_pixel = 10000;
+    let samples_per_pixel = 100;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
