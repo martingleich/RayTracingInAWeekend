@@ -16,3 +16,17 @@ pub fn clamp<T: PartialOrd<T>>(low: T, high: T, value: T) -> T {
         value
     }
 }
+
+pub fn min_array(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0].min(b[0]), a[1].min(b[1]), a[1].min(b[1])]
+}
+pub fn max_array(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0].max(b[0]), a[1].max(b[1]), a[1].max(b[1])]
+}
+pub fn minmax<T: std::cmp::PartialOrd>(a: T, b: T) -> (T, T) {
+    if a < b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}

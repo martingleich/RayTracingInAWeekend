@@ -29,14 +29,14 @@ use worlds::World;
 
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
-    let image_size = Size2i::new(800, 600);
-    let samples_per_pixel = 100;
+    let image_size = Size2i::new(800, 800);
+    let samples_per_pixel = 200;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_simple_plane(image_size.aspect_ratio(), &mut arena);
+    let world = worlds::create_world_cornell_box(image_size.aspect_ratio(), &mut arena);
 
     let pixels = render(
         image_size,
@@ -221,8 +221,8 @@ fn merge_planes(mut planes: Vec<Vec<Color>>) -> Vec<Color> {
     let mut pixels = planes.pop().unwrap();
     for plane in &planes {
         debug_assert_eq!(pixels.len(), plane.len());
-        for (p, i) in plane.iter().enumerate() {
-            pixels[p] += *i;
+        for (i, p) in plane.iter().enumerate() {
+            pixels[i] += *p;
         }
     }
     for pix in &mut pixels {

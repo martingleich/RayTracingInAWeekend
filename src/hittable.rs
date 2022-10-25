@@ -169,7 +169,14 @@ impl<'a> Hittable for Rect<'a> {
                     let y = Dir3::dot(q, v_temp) / Dir3::dot(self.axis_up, v_temp);
                     if (0.0..1.0).contains(&y) {
                         let uv = Vec2f::new(x, y);
-                        return Some(HitInteraction::new_from_ray(ray, &position, &normal, t, self.material, uv));
+                        return Some(HitInteraction::new_from_ray(
+                            ray,
+                            &position,
+                            &normal,
+                            t,
+                            self.material,
+                            uv,
+                        ));
                     }
                 }
             };
@@ -202,8 +209,7 @@ impl<'a, T: Hittable> Hittable for MovingHittable<'a, T> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
         moved_ray.origin = moved_ray.origin - self.velocity * ray.time;
-        self.hittable.hit(&moved_ray, t_range).map(|mut f|
-        {
+        self.hittable.hit(&moved_ray, t_range).map(|mut f| {
             f.position += self.velocity * ray.time;
             f
         })
@@ -245,24 +251,74 @@ impl<'a, T: Hittable> Hittable for TranslatedHittable<'a, T> {
     }
 
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
-        self.hittable.bounding_box(time_range).map(|f| {f.translate(self.offset)})
+        self.hittable
+            .bounding_box(time_range)
+            .map(|f| f.translate(self.offset))
     }
 }
 
-pub struct Box<'a> {
-    aabb : Aabb,
-    sides : HittableList<Rect<'a>>,
-    material : &'a Material<'a>
+pub struct AxisAlignedBox<'a> {
+    aabb: Aabb,
+    sides: HittableList<Rect<'a>>,
 }
 
-impl<'a> Box<'a> {
-    pub fn new(aabb: Aabb, material : &'a Material<'a>) -> Self {
+impl<'a> AxisAlignedBox<'a> {
+    pub fn new(aabb: &Aabb, material: &'a Material<'a>) -> Self {
         let sides = {
             let mut sides = HittableList::new();
-            sides.push(hittable)
+            sides.push(Rect {
+                corner: aabb.min,
+                axis_right: aabb.right(),
+                axis_up: aabb.up(),
+                material,
+            });
+            sides.push(Rect {
+                corner: aabb.min,
+                axis_right: aabb.forward(),
+                axis_up: aabb.up(),
+                material,
+            });
+            sides.push(Rect {
+                corner: aabb.min,
+                axis_right: aabb.forward(),
+                axis_up: aabb.right(),
+                material,
+            });
+            sides.push(Rect {
+                corner: aabb.max,
+                axis_right: -aabb.right(),
+                axis_up: -aabb.up(),
+                material,
+            });
+            sides.push(Rect {
+                corner: aabb.max,
+                axis_right: -aabb.forward(),
+                axis_up: -aabb.up(),
+                material,
+            });
+            sides.push(Rect {
+                corner: aabb.max,
+                axis_right: -aabb.forward(),
+                axis_up: -aabb.right(),
+                material,
+            });
             sides
+        };
+        Self { aabb: *aabb, sides }
+    }
+}
+
+impl<'a> Hittable for AxisAlignedBox<'a> {
+    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+        if self.aabb.hit(ray, t_range) {
+            self.sides.hit(ray, t_range)
+        } else {
+            None
         }
-        Self { aabb, sides }
+    }
+
+    fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
+        Some(self.aabb)
     }
 }
 

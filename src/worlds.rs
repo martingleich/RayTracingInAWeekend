@@ -1,18 +1,117 @@
 use rand::{Rng, SeedableRng};
 
+use crate::aabb::Aabb;
 use crate::camera::Camera;
 use crate::color::Color;
-use crate::hittable::{Hittable, HittableList, MovingHittable, Rect, Sphere};
+use crate::hittable::{Hittable, HittableList, MovingHittable, Rect, Sphere, AxisAlignedBox};
 
 use crate::background_color::BackgroundColor;
 use crate::material::Material;
 use crate::texture::Texture;
 use crate::vec3::{Dir3, Point3};
+use crate::worlds::create_utils::solid_lambert;
+
+use self::create_utils::solid_diffuse_light;
 
 pub struct World<T: Hittable> {
     pub camera: Camera,
     pub hittable: T,
     pub background: BackgroundColor,
+}
+
+mod create_utils {
+    use crate::{color::Color, material::Material, texture::Texture};
+
+    pub fn solid_lambert(arena: &bumpalo::Bump, color: Color) -> &Material {
+        let texture = arena.alloc(Texture::Solid { color });
+        arena.alloc(Material::Lambert { albedo: texture })
+    }
+
+    pub fn solid_diffuse_light(arena: &bumpalo::Bump, color: Color) -> &Material {
+        let texture = arena.alloc(Texture::Solid { color });
+        arena.alloc(Material::DiffuseLight { emit: texture })
+    }
+}
+
+pub fn create_world_cornell_box<'a>(
+    aspect_ratio: f32,
+    arena: &'a mut bumpalo::Bump,
+) -> World<HittableList<Box<dyn 'a + Hittable>>> {
+    let hsize = 278.0;
+    let camera = Camera::build()
+        .vertical_fov(40.0, aspect_ratio)
+        .position(Point3::new(hsize, hsize, -800.0))
+        .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
+        .build();
+
+    let red = solid_lambert(arena, Color::new_rgb(0.65, 0.05, 0.05));
+    let white = solid_lambert(arena, Color::new_rgb(0.73, 0.73, 0.73));
+    let green = solid_lambert(arena, Color::new_rgb(0.12, 0.45, 0.15));
+    let light = solid_diffuse_light(arena, Color::new_rgb(15.0, 15.0, 15.0));
+
+    let hittable = {
+        let walls = {
+            let mut items = HittableList::new();
+            items.push(Rect::new_yz(
+                Point3::new(0.0, hsize, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                red,
+            ));
+            items.push(Rect::new_yz(
+                Point3::new(2.0 * hsize, hsize, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                green,
+            ));
+            items.push(Rect::new_xz(
+                Point3::new(hsize, 0.0, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                white,
+            ));
+            items.push(Rect::new_xz(
+                Point3::new(hsize, 2.0 * hsize, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                white,
+            ));
+            items.push(Rect::new_xy(
+                Point3::new(hsize, hsize, 2.0 * hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                white,
+            ));
+            items.push(Rect::new_xz(
+                Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
+                130.0,
+                130.0,
+                light,
+            ));
+            items
+        };
+
+        let boxes = {
+            let mut boxes = HittableList::new();
+            boxes.push(AxisAlignedBox::new(&Aabb{min:Point3::new(130.0, 0.0, 65.0), max: Point3::new(295.0, 165.0, 230.0)}, white));
+            boxes.push(AxisAlignedBox::new(&Aabb{min:Point3::new(265.0, 0.0, 295.0), max: Point3::new(430.0, 330.0, 460.0)}, white));
+            boxes
+        };
+
+        let mut world = HittableList::<Box<dyn Hittable>>::new();
+        world.push(Box::new(walls));
+        world.push(Box::new(boxes));
+
+        world
+    };
+
+    World {
+        background: BackgroundColor::Solid {
+            color: Color::BLACK,
+        },
+        camera,
+        hittable,
+    }
 }
 
 pub fn create_world_simple_plane(
@@ -126,10 +225,10 @@ pub fn create_world_moving_spheres<'a>(
             mat_ground,
         )));
 
-        let sphere1 = Sphere::new(Point3::new(-2.0, 1.5, 0.0), 0.5, mat_red);
+        let sphere1 = arena.alloc(Sphere::new(Point3::new(-2.0, 1.5, 0.0), 0.5, mat_red));
         let moving_sphere_1 = MovingHittable::new(sphere1, Dir3::new(2.0, 0.0, 0.0));
 
-        let sphere2 = Sphere::new(Point3::new(0.0, 0.5, 0.0), 0.5, mat_blue);
+        let sphere2 = arena.alloc(Sphere::new(Point3::new(0.0, 0.5, 0.0), 0.5, mat_blue));
         let moving_sphere_2 = MovingHittable::new(sphere2, Dir3::new(0.0, 1.0, 0.0));
 
         world.push(Box::new(moving_sphere_1));
