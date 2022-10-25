@@ -207,7 +207,7 @@ pub fn create_world_moving_spheres<'a>(
         color: Color::new_rgb(1.0, 1.0, 1.0),
     });
     let tex_ground = arena.alloc(Texture::Checker {
-        frequency: 10.0,
+        inv_frequency: 10.0,
         even: tex_black,
         odd: tex_white,
     });

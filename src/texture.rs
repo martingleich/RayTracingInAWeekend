@@ -6,7 +6,7 @@ pub enum Texture<'a> {
         color: Color,
     },
     Checker {
-        frequency: f32,
+        inv_frequency: f32,
         even: &'a Texture<'a>,
         odd: &'a Texture<'a>,
     },
@@ -20,7 +20,7 @@ impl<'a> Texture<'a> {
         match *self {
             Texture::Solid { color } => color,
             Texture::Checker {
-                frequency,
+                inv_frequency: frequency,
                 even,
                 odd,
             } => {
