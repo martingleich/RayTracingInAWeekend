@@ -177,7 +177,7 @@ impl Camera {
             Dir3::ZERO
         };
 
-        // Motion blur
+        // Motion blur/rolling shutter
         let time = rng.gen_range(self.time_interval.clone()) + Vec2f::dot(self.shutter_pace, point);
 
         Ray::new(

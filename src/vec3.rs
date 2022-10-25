@@ -120,19 +120,24 @@ impl Point3 {
         Self::new(c[0], c[1], c[2])
     }
     pub const ORIGIN: Self = Self(Vec3 { e: [0.0, 0.0, 0.0] });
+
+    pub fn right(self) -> f32 { self.0.e[0] }
+    pub fn up(self) -> f32 { self.0.e[1] }
+    pub fn forward(self) -> f32 { self.0.e[2] }
+    pub fn components(self) -> [f32;3] { self.0.e }
 }
 
 impl Dir3 {
-    pub fn new(x: f32, y: f32, z: f32) -> Self {
-        Self(Vec3 { e: [x, y, z] })
+    pub fn new(right : f32, up: f32, forward: f32) -> Self {
+        Self(Vec3 { e: [right, up, forward] })
     }
     pub fn new_from_arr(c: [f32; 3]) -> Self {
         Self::new(c[0], c[1], c[2])
     }
-
-    pub fn new_xy_from_arr(c: [f32; 2]) -> Self {
-        Self::new(c[0], c[1], 0.0)
-    }
+  
+    pub fn right(self) -> f32 { self.0.e[0] }
+    pub fn up(self) -> f32 { self.0.e[1] }
+    pub fn forward(self) -> f32 { self.0.e[2] }
 
     pub const ZERO: Self = Self(Vec3 { e: [0.0, 0.0, 0.0] });
     pub const RIGHT: Self = Self(Vec3 { e: [1.0, 0.0, 0.0] });
@@ -206,6 +211,11 @@ impl Dir3 {
         let r_out_parallel = -f32::sqrt(f32::abs(1.0 - r_out_perp.length_squared())) * normal;
         r_out_perp + r_out_parallel
     }
+    pub fn to_radian(self) -> (f32, f32, f32) {
+        let theta = self.0.e[1].acos();
+        let phi = f32::atan2(-self.0.e[2], self.0.e[0]) + std::f32::consts::PI;
+        (phi / std::f32::consts::TAU, theta / std::f32::consts::PI, self.length())
+    }
 }
 
 // Point
@@ -234,6 +244,12 @@ impl std::ops::Add<Dir3> for Point3 {
 impl std::ops::AddAssign<Dir3> for Point3 {
     fn add_assign(&mut self, rhs: Dir3) {
         *self = *self + rhs;
+    }
+}
+
+impl std::ops::SubAssign<Dir3> for Point3 {
+    fn sub_assign(&mut self, rhs: Dir3) {
+        *self = *self - rhs;
     }
 }
 

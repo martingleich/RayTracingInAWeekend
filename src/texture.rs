@@ -1,4 +1,4 @@
-use crate::{color::Color, hittable::HitInteraction};
+use crate::{color::Color, hittable::HitInteraction, vec3::Point3};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Texture<'a> {
@@ -24,8 +24,8 @@ impl<'a> Texture<'a> {
                 even,
                 odd,
             } => {
-                let s = interaction.position.0 * frequency;
-                let sines = s.e[0].sin() * s.e[1].sin() * s.e[2].sin();
+                let s = (interaction.position - Point3::ORIGIN) * frequency;
+                let sines = s.right().sin() * s.up().sin() * s.forward().sin();
                 let t = if sines < 0.0 { even } else { odd };
                 t.sample(interaction)
             }

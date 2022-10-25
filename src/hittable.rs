@@ -5,7 +5,7 @@ use crate::{
     ray::Ray,
     vec2::Vec2f,
     vec3::{Dir3, Point3},
-    Material,
+    Material, transformations::Transformation,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -67,9 +67,8 @@ impl<'a> Sphere<'a> {
 }
 
 fn get_sphere_uv(pos: Dir3) -> Vec2f {
-    let theta = pos.0.e[1].acos();
-    let phi = f32::atan2(-pos.0.e[2], pos.0.e[0]) + std::f32::consts::PI;
-    Vec2f::new(phi / std::f32::consts::TAU, theta / std::f32::consts::PI)
+    let (theta, phi, _) = pos.to_radian();
+    Vec2f::new(theta, phi)
 }
 
 impl<'a> Hittable for Sphere<'a> {
@@ -97,6 +96,7 @@ impl<'a> Hittable for Sphere<'a> {
             let position = ray.at(root);
             let surface_normal = (position - self.center) / self.radius;
             let uv = get_sphere_uv(surface_normal);
+            
             Some(HitInteraction::new_from_ray(
                 ray,
                 &position,
@@ -208,7 +208,7 @@ impl<'a, T: Hittable> Hittable for MovingHittable<'a, T> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
-        moved_ray.origin = moved_ray.origin - self.velocity * ray.time;
+        moved_ray.origin -= self.velocity * ray.time;
         self.hittable.hit(&moved_ray, t_range).map(|mut f| {
             f.position += self.velocity * ray.time;
             f
@@ -224,36 +224,37 @@ impl<'a, T: Hittable> Hittable for MovingHittable<'a, T> {
             .hittable
             .bounding_box(&(time_range.end..time_range.end))?
             .translate(self.velocity * time_range.end);
-        Some(Aabb::new_surrounding_boxes(&start_box, &end_box))
+        Some(Aabb::new_surrounding_boxes(&[start_box, end_box]))
     }
 }
 
-pub struct TranslatedHittable<'a, T: Hittable> {
-    offset: Dir3,
-    hittable: &'a T,
+
+pub struct TransformedHittable<'a, THit: Hittable, TTrans : Transformation> {
+    pub hittable: &'a THit,
+    pub transformation : TTrans,
 }
 
-impl<'a, T: Hittable> TranslatedHittable<'a, T> {
-    pub fn new(hittable: &'a T, offset: Dir3) -> Self {
-        Self { hittable, offset }
-    }
-}
-
-impl<'a, T: Hittable> Hittable for TranslatedHittable<'a, T> {
+impl<'a, THit: Hittable, TTrans : Transformation> Hittable for TransformedHittable<'a, THit, TTrans> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
-        moved_ray.origin = moved_ray.origin - self.offset;
+        self.transformation.reverse_point(&mut moved_ray.origin);
+        self.transformation.reverse_dir(&mut moved_ray.direction);
         self.hittable.hit(&moved_ray, t_range).map(|mut f| {
-            f.position += self.offset;
+            self.transformation.apply_point(&mut f.position);
+            self.transformation.apply_dir(&mut f.normal);
             f
         })
     }
 
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
-        self.hittable
-            .bounding_box(time_range)
-            .map(|f| f.translate(self.offset))
+        self.hittable.bounding_box(time_range).map(|b| {
+            let corners = b.corners();
+            for mut c in corners {
+                self.transformation.apply_point(&mut c)
+            }
+            Aabb::new_surrounding_points(&corners)
+        })
     }
 }
 
@@ -368,7 +369,7 @@ impl<T: Hittable> Hittable for HittableList<T> {
         for hittable in &self.hittables {
             if let Some(aabb) = &hittable.bounding_box(time_range) {
                 if let Some(old) = &result {
-                    result = Some(Aabb::new_surrounding_boxes(old, aabb))
+                    result = Some(Aabb::new_surrounding_boxes(&[*old, *aabb]))
                 } else {
                     result = Some(*aabb);
                 }
@@ -420,7 +421,7 @@ impl BoundingVolumeHierarchy {
                 let (left_hittable, left_box) = hittables.pop().unwrap();
                 let (right_hittable, right_box) = hittables.pop().unwrap();
                 Self {
-                    aabb: Aabb::new_surrounding_boxes(&left_box, &right_box),
+                    aabb: Aabb::new_surrounding_boxes(&[left_box, right_box]),
                     left: left_hittable,
                     right: Some(right_hittable),
                 }
@@ -433,7 +434,7 @@ impl BoundingVolumeHierarchy {
                 let left = Box::new(Self::new_inner(hittables, (axis_id + 1) % 3));
                 let right = Box::new(Self::new_inner(right_half, (axis_id + 1) % 3));
                 Self {
-                    aabb: Aabb::new_surrounding_boxes(&left.aabb, &right.aabb),
+                    aabb: Aabb::new_surrounding_boxes(&[left.aabb, right.aabb]),
                     left,
                     right: Some(right),
                 }

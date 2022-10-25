@@ -21,11 +21,18 @@ impl Aabb {
             center + Dir3::new(radius, radius, radius),
         )
     }
-    pub fn new_surrounding_boxes(a: &Aabb, b: &Aabb) -> Self {
-        Self::new_corners(
-            Point3::new_from_arr(math::min_array(a.min.0.e, b.min.0.e)),
-            Point3::new_from_arr(math::max_array(a.max.0.e, b.max.0.e)),
-        )
+    pub fn new_surrounding_boxes(boxes: &[Aabb]) -> Self {
+        let mut min = boxes[0].min.0.e;
+        let mut max = boxes[0].max.0.e;
+        for b in &boxes[1..] {
+            min = math::min_array(min, b.min.0.e);
+            max = math::max_array(max, b.max.0.e);
+        }
+        Self
+        {
+            min: Point3::new_from_arr(min),
+            max: Point3::new_from_arr(max),
+        }
     }
     pub fn new_surrounding_points(points: &[Point3]) -> Self {
         let mut min = points[0].0.e;
@@ -34,7 +41,11 @@ impl Aabb {
             min = math::min_array(min, p.0.e);
             max = math::max_array(max, p.0.e);
         }
-        Self::new_corners(Point3::new_from_arr(min), Point3::new_from_arr(max))
+        Self
+        {
+            min: Point3::new_from_arr(min),
+            max: Point3::new_from_arr(max),
+        }
     }
 
     pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> bool {
@@ -63,5 +74,17 @@ impl Aabb {
     }
     pub fn forward(&self) -> Dir3 {
         Dir3::new(0.0, 0.0, self.max.0.e[2] - self.min.0.e[2])
+    }
+    pub fn corners(&self) -> [Point3; 8] {
+        [
+            self.min,
+            self.min + self.right(),
+            self.min + self.up(),
+            self.min + self.forward(),
+            self.max,
+            self.max - self.right(),
+            self.max - self.up(),
+            self.max - self.forward(),
+        ]
     }
 }
