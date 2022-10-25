@@ -168,14 +168,8 @@ impl<'a> Hittable for Rect<'a> {
                     let v_temp = Dir3::cross(normal, self.axis_right);
                     let y = Dir3::dot(q, v_temp) / Dir3::dot(self.axis_up, v_temp);
                     if (0.0..1.0).contains(&y) {
-                        return Some(HitInteraction {
-                            position,
-                            normal,
-                            uv: Vec2f { x, y },
-                            t,
-                            front_face: denom <= 0.0,
-                            material: self.material,
-                        });
+                        let uv = Vec2f::new(x, y);
+                        return Some(HitInteraction::new_from_ray(ray, &position, &normal, t, self.material, uv));
                     }
                 }
             };
@@ -192,23 +186,27 @@ impl<'a> Hittable for Rect<'a> {
     }
 }
 
-pub struct MovingHittable<T: Hittable> {
+pub struct MovingHittable<'a, T: Hittable> {
     velocity: Dir3,
-    hittable: T,
+    hittable: &'a T,
 }
 
-impl<T: Hittable> MovingHittable<T> {
-    pub fn new(hittable: T, velocity: Dir3) -> Self {
+impl<'a, T: Hittable> MovingHittable<'a, T> {
+    pub fn new(hittable: &'a T, velocity: Dir3) -> Self {
         Self { hittable, velocity }
     }
 }
 
-impl<T: Hittable> Hittable for MovingHittable<T> {
+impl<'a, T: Hittable> Hittable for MovingHittable<'a, T> {
     fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
         moved_ray.origin = moved_ray.origin - self.velocity * ray.time;
-        self.hittable.hit(&moved_ray, t_range)
+        self.hittable.hit(&moved_ray, t_range).map(|mut f|
+        {
+            f.position += self.velocity * ray.time;
+            f
+        })
     }
 
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
@@ -221,6 +219,50 @@ impl<T: Hittable> Hittable for MovingHittable<T> {
             .bounding_box(&(time_range.end..time_range.end))?
             .translate(self.velocity * time_range.end);
         Some(Aabb::new_surrounding_boxes(&start_box, &end_box))
+    }
+}
+
+pub struct TranslatedHittable<'a, T: Hittable> {
+    offset: Dir3,
+    hittable: &'a T,
+}
+
+impl<'a, T: Hittable> TranslatedHittable<'a, T> {
+    pub fn new(hittable: &'a T, offset: Dir3) -> Self {
+        Self { hittable, offset }
+    }
+}
+
+impl<'a, T: Hittable> Hittable for TranslatedHittable<'a, T> {
+    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+        // Instead of transforming the object the just move the ray backward
+        let mut moved_ray = *ray;
+        moved_ray.origin = moved_ray.origin - self.offset;
+        self.hittable.hit(&moved_ray, t_range).map(|mut f| {
+            f.position += self.offset;
+            f
+        })
+    }
+
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
+        self.hittable.bounding_box(time_range).map(|f| {f.translate(self.offset)})
+    }
+}
+
+pub struct Box<'a> {
+    aabb : Aabb,
+    sides : HittableList<Rect<'a>>,
+    material : &'a Material<'a>
+}
+
+impl<'a> Box<'a> {
+    pub fn new(aabb: Aabb, material : &'a Material<'a>) -> Self {
+        let sides = {
+            let mut sides = HittableList::new();
+            sides.push(hittable)
+            sides
+        }
+        Self { aabb, sides }
     }
 }
 
