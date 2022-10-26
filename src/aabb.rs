@@ -60,6 +60,52 @@ impl Aabb {
         }
         true
     }
+    pub fn intersections_line(&self, origin : Point3, direction : Dir3) -> Option<((f32, usize), (f32, usize))> {
+        let min = self.min - origin;
+        let max = self.max - origin;
+        let mut near = f32::NEG_INFINITY;
+        let mut far = f32::INFINITY;
+        let mut near_plane = 0;
+        let mut far_plane = 0;
+
+        // X
+        let t1 = min.0.e[0] / direction.0.e[0];
+        let t2 = max.0.e[0] / direction.0.e[0];
+        let t_min = t1.min(t2);
+        let t_max = t1.max(t2);
+        if t_min > near { near = t_min; near_plane = 0;}
+        if t_max < far { far = t_max; far_plane = 0}
+        if near > far || far < 0.0
+        {
+            return None;
+        }
+
+        // Y
+        let t1 = min.0.e[1] / direction.0.e[1];
+        let t2 = max.0.e[1] / direction.0.e[1];
+        let t_min = t1.min(t2);
+        let t_max = t1.max(t2);
+        if t_min > near {near = t_min; near_plane = 1; }
+        if t_max < far {far = t_max; far_plane = 1; }
+        if near > far || far < 0.0
+        {
+            return None;
+        }
+
+        // Z
+        let t1 = min.0.e[2] / direction.0.e[2];
+        let t2 = max.0.e[2] / direction.0.e[2];
+        let t_min = t1.min(t2);
+        let t_max = t1.max(t2);
+        if t_min > near {near = t_min; near_plane = 2;}
+        if t_max < far {far = t_max; far_plane = 2;}
+        if near > far || far < 0.0
+        {
+            return None;
+        }
+
+        return Some(((near, near_plane), (far, far_plane)));
+    }
 
     pub fn translate(&self, offset: Dir3) -> Aabb {
         Self::new_corners(self.min + offset, self.max + offset)

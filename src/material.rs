@@ -1,3 +1,4 @@
+use crate::common;
 use crate::hittable::HitInteraction;
 use crate::{color::Color, texture::Texture};
 
@@ -12,14 +13,15 @@ pub enum Material<'a> {
     Metal { albedo: &'a Texture<'a>, fuzz: f32 },
     Dielectric { index_of_refraction: f32 },
     DiffuseLight { emit: &'a Texture<'a> },
+    Isotropic { albedo: &'a Texture<'a> },
 }
 
 impl<'a> Material<'a> {
-    pub fn scatter<TRng: Rng>(
+    pub fn scatter(
         &self,
         ray: &Ray,
         interaction: &HitInteraction,
-        rng: &mut TRng,
+        rng: &mut common::TRng,
     ) -> Option<(Color, Ray)> {
         match *self {
             Material::Lambert { albedo } => {
@@ -64,6 +66,14 @@ impl<'a> Material<'a> {
                 };
                 let scattered = Ray::new(interaction.position, direction, ray.time);
                 Some((Color::WHITE, scattered))
+            }
+            Material::Isotropic { albedo } => {
+                let scattered = Ray::new(
+                    interaction.position,
+                    Dir3::new_from_arr(UnitSphere.sample(rng)),
+                    ray.time,
+                );
+                Some((albedo.sample(interaction), scattered))
             }
             _ => None,
         }

@@ -3,6 +3,7 @@ mod aabb;
 mod background_color;
 mod camera;
 mod color;
+mod common;
 mod hittable;
 mod material;
 mod math;
@@ -31,13 +32,13 @@ use worlds::World;
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
     let image_size = Size2i::new(800, 800);
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 2000;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_cornell_box(image_size.aspect_ratio(), &mut arena);
+    let world = worlds::create_world_cornell_box_smoke(image_size.aspect_ratio(), &mut arena);
 
     let pixels = render(
         image_size,
@@ -58,11 +59,11 @@ fn main() -> Result<(), ImageError> {
     )
 }
 
-fn ray_color<THit: Hittable, TRng: rand::Rng>(
+fn ray_color<THit: Hittable>(
     ray: &Ray,
     world: &THit,
     background_color: &BackgroundColor,
-    rng: &mut TRng,
+    rng: &mut common::TRng,
     max_depth: i32,
 ) -> Color {
     let mut depth = max_depth;
@@ -70,7 +71,7 @@ fn ray_color<THit: Hittable, TRng: rand::Rng>(
     let mut emitted: Color = Color::BLACK;
     let mut cur_ray = *ray;
     loop {
-        if let Some(interaction) = world.hit(&cur_ray, &(0.0001..f32::INFINITY)) {
+        if let Some(interaction) = world.hit(&cur_ray, &(0.0001..f32::INFINITY), rng) {
             if depth <= 1 {
                 return Color::BLACK;
             } else if let Some((new_attentuation, scattered)) =
@@ -141,8 +142,7 @@ fn render<T: Hittable>(
             .into_iter()
             .map(|(thread_id, real_samples_per_pixel)| {
                 let render_pixel = {
-                    let mut sub_rng =
-                        rand_xoshiro::Xoroshiro128PlusPlus::from_rng(&mut rng).unwrap();
+                    let mut sub_rng = common::TRng::from_rng(&mut rng).unwrap();
                     move |fpix: Vec2f| {
                         (0..real_samples_per_pixel)
                             .map(|_| {

@@ -3,8 +3,9 @@ use rand::{Rng, SeedableRng};
 use crate::aabb::Aabb;
 use crate::camera::Camera;
 use crate::color::Color;
+use crate::common;
 use crate::hittable::{
-    AxisAlignedBox, Hittable, HittableList, MovingHittable, Rect, Sphere, TransformedHittable,
+    AxisAlignedBox, Hittable, HittableList, MovingHittable, Rect, Sphere, TransformedHittable, ConstantMedium,
 };
 
 use crate::background_color::BackgroundColor;
@@ -13,7 +14,7 @@ use crate::texture::Texture;
 use crate::transformations::{RotationAroundUp, Translation};
 use crate::vec3::{Dir3, Point3};
 
-use self::create_utils::solid_diffuse_light;
+use self::create_utils::{solid_diffuse_light, smoke};
 use crate::worlds::create_utils::solid_lambert;
 
 pub struct World<T: Hittable> {
@@ -33,6 +34,132 @@ mod create_utils {
     pub fn solid_diffuse_light(arena: &bumpalo::Bump, color: Color) -> &Material {
         let texture = arena.alloc(Texture::Solid { color });
         arena.alloc(Material::DiffuseLight { emit: texture })
+    }
+
+    pub fn smoke(arena: &bumpalo::Bump, color: Color) -> &Material {
+        let texture = arena.alloc(Texture::Solid { color });
+        arena.alloc(Material::Isotropic {  albedo: texture })
+    }
+}
+pub fn create_world_cornell_box_smoke<'a>(
+    aspect_ratio: f32,
+    arena: &'a mut bumpalo::Bump,
+) -> World<HittableList<Box<dyn 'a + Hittable>>> {
+    let hsize = 278.0;
+    let camera = Camera::build()
+        .vertical_fov(40.0, aspect_ratio)
+        .position(Point3::new(hsize, hsize, -800.0))
+        .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
+        .build();
+
+    let red = solid_lambert(arena, Color::new_rgb(0.65, 0.05, 0.05));
+    let white = solid_lambert(arena, Color::new_rgb(0.73, 0.73, 0.73));
+    let green = solid_lambert(arena, Color::new_rgb(0.12, 0.45, 0.15));
+    let smoke_black = smoke(arena, Color::new_rgb(0.0, 0.0, 0.0));
+    let smoke_white = smoke(arena, Color::new_rgb(1.0, 1.0, 1.0));
+    let light = solid_diffuse_light(arena, Color::new_rgb(7.0, 7.0, 7.0));
+
+    let hittable = {
+        let walls = {
+            let mut items = HittableList::new();
+            items.push(Rect::new_yz(
+                Point3::new(0.0, hsize, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                red,
+            ));
+            items.push(Rect::new_yz(
+                Point3::new(2.0 * hsize, hsize, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                green,
+            ));
+            items.push(Rect::new_xz(
+                Point3::new(hsize, 0.0, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                white,
+            ));
+            items.push(Rect::new_xz(
+                Point3::new(hsize, 2.0 * hsize, hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                white,
+            ));
+            items.push(Rect::new_xy(
+                Point3::new(hsize, hsize, 2.0 * hsize),
+                2.0 * hsize,
+                2.0 * hsize,
+                white,
+            ));
+            items.push(Rect::new_xz(
+                Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
+                300.0,
+                300.0,
+                light,
+            ));
+            items
+        };
+
+        let boxes = {
+            // let mut boxes = HittableList::new();
+            // let sphere = arena.alloc(Sphere::new(Point3::new(265.0, 150.0, 295.0), 100.0, smoke_black));
+            // boxes.push(ConstantMedium::new(sphere, smoke_black, 0.01));
+            let mut boxes = HittableList::new();
+            let box1_base = arena.alloc(AxisAlignedBox::new(
+                &Aabb {
+                    min: Point3::new(0.0, 0.0, 0.0),
+                    max: Point3::new(165.0, 330.0, 165.0),
+                },
+                white,
+            ));
+            let box1_rot = arena.alloc(TransformedHittable {
+                hittable: box1_base,
+                transformation: RotationAroundUp::new(-15.0),
+            });
+            let box1 = arena.alloc(TransformedHittable {
+                hittable: box1_rot,
+                transformation: Translation {
+                    offset: Dir3::new(265.0, 0.0, 295.0),
+                },
+            });
+            boxes.push(ConstantMedium::new(box1, smoke_white, 0.01));
+
+            let box2_base = arena.alloc(AxisAlignedBox::new(
+                &Aabb {
+                    min: Point3::new(0.0, 0.0, 0.0),
+                    max: Point3::new(165.0, 165.0, 165.0),
+                },
+                white,
+            ));
+            let box2_rot = arena.alloc(TransformedHittable {
+                hittable: box2_base,
+                transformation: RotationAroundUp::new(18.0),
+            });
+            let box2 = arena.alloc(TransformedHittable {
+                hittable: box2_rot,
+                transformation: Translation {
+                    offset: Dir3::new(130.0, 0.0, 65.0),
+                },
+            });
+            boxes.push(ConstantMedium::new(box2, smoke_black, 0.01));
+
+            boxes
+        };
+
+        let mut world = HittableList::<Box<dyn Hittable>>::new();
+        world.push(Box::new(walls));
+        world.push(Box::new(boxes));
+
+        world
+    };
+
+    World {
+        background: BackgroundColor::Solid {
+            color: Color::BLACK,
+        },
+        camera,
+        hittable,
     }
 }
 
@@ -286,7 +413,7 @@ pub fn create_world_moving_spheres<'a>(
 pub fn create_world_random_scene(
     aspect_ratio: f32,
     arena: &mut bumpalo::Bump,
-    seed: <rand_xoshiro::Xoroshiro128PlusPlus as SeedableRng>::Seed,
+    seed: <common::TRng as SeedableRng>::Seed,
 ) -> World<HittableList<Sphere>> {
     let camera = Camera::build()
         .vertical_fov(60.0, aspect_ratio)
@@ -296,7 +423,7 @@ pub fn create_world_random_scene(
         .aperture(0.1)
         .build();
 
-    let mut rng = rand_xoshiro::Xoroshiro128PlusPlus::from_seed(seed);
+    let mut rng = common::TRng::from_seed(seed);
 
     let hittable = {
         let mut world = HittableList::<Sphere>::new();

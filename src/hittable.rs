@@ -1,8 +1,10 @@
 use std::ops::Range;
 
+use rand::Rng;
+
 use crate::{
     aabb::Aabb,
-    math,
+    common,
     ray::Ray,
     transformations::Transformation,
     vec2::Vec2f,
@@ -47,7 +49,12 @@ impl<'a> HitInteraction<'a> {
 }
 
 pub trait Hittable: Send + Sync {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction>;
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction>;
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb>;
 }
 
@@ -74,7 +81,12 @@ fn get_sphere_uv(pos: Dir3) -> Vec2f {
 }
 
 impl<'a> Hittable for Sphere<'a> {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        _rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
         let oc = ray.origin - self.center;
         let half_b = Dir3::dot(oc, ray.direction);
         let c = oc.length_squared() - self.radius * self.radius;
@@ -159,7 +171,12 @@ impl<'a> Rect<'a> {
 }
 
 impl<'a> Hittable for Rect<'a> {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        _rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
         let (p0, p1, n) = match self.rect_plane {
             RectPlane::Xy => (0, 1, 2),
             RectPlane::Xz => (0, 2, 1),
@@ -174,7 +191,7 @@ impl<'a> Hittable for Rect<'a> {
                     (position.0.e[p1] - self.r2.start) / (self.r1.end - self.r2.start),
                 );
                 let mut surface_normal = Dir3::ZERO;
-                surface_normal.0.e[n] = 1.0;
+                surface_normal.0.e[n] = -1.0;
                 return Some(HitInteraction::new_from_ray(
                     ray,
                     &position,
@@ -205,11 +222,16 @@ impl<'a, T: Hittable> MovingHittable<'a, T> {
 }
 
 impl<'a, T: Hittable> Hittable for MovingHittable<'a, T> {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
         moved_ray.origin -= self.velocity * ray.time;
-        self.hittable.hit(&moved_ray, t_range).map(|mut f| {
+        self.hittable.hit(&moved_ray, t_range, rng).map(|mut f| {
             f.position += self.velocity * ray.time;
             f
         })
@@ -243,51 +265,34 @@ impl<'a> AxisAlignedBox<'a> {
 }
 
 impl<'a> Hittable for AxisAlignedBox<'a> {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
-        let mut min_t = f32::INFINITY;
-        let mut uv = Vec2f::ZERO;
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        _rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
+
+        let ((near_t, near_plane), (far_t, far_plane)) = self.aabb.intersections_line(ray.origin, ray.direction)?;
+        let (t, plane) = if t_range.contains(&near_t) {
+            (near_t, near_plane)
+        } else if t_range.contains(&far_t) {
+            (far_t, far_plane)
+        } else {
+            return None;
+        };
+        let position = ray.origin + t * ray.direction;
+        let dir = (position.0.e[plane] - 0.5*(self.aabb.max.0.e[plane] - self.aabb.min.0.e[plane])).signum();
+
         let mut surface_normal = Dir3::ZERO;
-        for p in 0..3 {
-            let (p0, p1, n) = match p {
-                0 => (0, 1, 2),
-                1 => (0, 2, 1),
-                2 => (1, 2, 0),
-                _ => panic!(),
-            };
-            let min_dist = (self.aabb.min.0.e[n] - ray.origin.0.e[n]) / ray.direction.0.e[n];
-            let max_dist = (self.aabb.max.0.e[n] - ray.origin.0.e[n]) / ray.direction.0.e[n];
-            let (t, t1) = math::minmax(min_dist, max_dist);
-            let t_min = t.max(t_range.start);
-            let t_max = t1.min(t_range.end);
-            if t_max <= t_min {
-                return None;
-            }
-            if t < min_t && t_range.contains(&t) {
-                let r0 = self.aabb.min.0.e[p0]..self.aabb.max.0.e[p0];
-                let r1 = self.aabb.min.0.e[p1]..self.aabb.max.0.e[p1];
-                let position = ray.origin + t * ray.direction;
-                if r0.contains(&position.0.e[p0]) && r1.contains(&position.0.e[p1]) {
-                    min_t = t;
-                    uv = Vec2f::new(
-                        (position.0.e[p0] - r0.start) / (r0.end - r0.start),
-                        (position.0.e[p1] - r1.start) / (r0.end - r1.start),
-                    );
-                    surface_normal = Dir3::ZERO;
-                    surface_normal.0.e[n] = 1.0;
-                }
-            }
-        }
-        if min_t != f32::INFINITY {
-            return Some(HitInteraction::new_from_ray(
-                ray,
-                &ray.at(min_t),
-                &surface_normal,
-                min_t,
-                self.material,
-                uv,
-            ));
-        }
-        None
+        surface_normal.0.e[plane] = dir;
+        return Some(HitInteraction::new_from_ray(
+            ray,
+            &position,
+            &surface_normal,
+            t,
+            self.material,
+            Vec2f::ZERO,
+        ));
     }
 
     fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
@@ -303,12 +308,17 @@ pub struct TransformedHittable<'a, THit: Hittable, TTrans: Transformation> {
 impl<'a, THit: Hittable, TTrans: Transformation> Hittable
     for TransformedHittable<'a, THit, TTrans>
 {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
         self.transformation.reverse_point(&mut moved_ray.origin);
         self.transformation.reverse_dir(&mut moved_ray.direction);
-        self.hittable.hit(&moved_ray, t_range).map(|mut f| {
+        self.hittable.hit(&moved_ray, t_range, rng).map(|mut f| {
             self.transformation.apply_point(&mut f.position);
             self.transformation.apply_dir(&mut f.normal);
             f
@@ -323,6 +333,63 @@ impl<'a, THit: Hittable, TTrans: Transformation> Hittable
             }
             Aabb::new_surrounding_points(&corners)
         })
+    }
+}
+
+pub struct ConstantMedium<'a, T: Hittable> {
+    boundary: &'a T,
+    phase_function: &'a Material<'a>,
+    neg_inv_density: f32,
+}
+
+impl<'a, T: Hittable> ConstantMedium<'a, T> {
+    pub fn new(boundary: &'a T, phase_function: &'a Material<'a>, density: f32) -> Self { Self { boundary, phase_function, neg_inv_density: -1.0 / density } }
+}
+
+impl<'a, T: Hittable> Hittable for ConstantMedium<'a, T> {
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
+        let start_boundary = self
+            .boundary
+            .hit(ray, &(f32::NEG_INFINITY..f32::INFINITY), rng)?.t;
+        let end_boundary =
+            self.boundary
+                .hit(ray, &(start_boundary + 0.0001..f32::INFINITY), rng)?.t;
+
+        let mut start_medium = start_boundary.max(t_range.start);
+        let end_medium = end_boundary.min(t_range.end);
+        if start_medium >= end_medium {
+            return None;
+        }
+
+        if start_medium < 0.0 {
+            start_medium = 0.0;
+        }
+
+        let distance_inside_boundary = end_medium - start_medium;
+        let hit_distance = self.neg_inv_density * rng.gen::<f32>().ln();
+
+        if hit_distance > distance_inside_boundary {
+            return None;
+        }
+
+        let t = start_medium + hit_distance;
+        Some(HitInteraction {
+            position: ray.at(t),
+            normal: Dir3::UP, // Arbitrary
+            uv: Vec2f::ZERO,  // Undefined
+            t,
+            front_face: false, // Arbitrary
+            material: self.phase_function,
+        })
+    }
+
+    fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
+        self.boundary.bounding_box(time_range)
     }
 }
 
@@ -342,8 +409,13 @@ impl<T: Hittable> HittableList<T> {
 }
 
 impl Hittable for Box<dyn Hittable + '_> {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
-        self.as_ref().hit(ray, t_range)
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
+        self.as_ref().hit(ray, t_range, rng)
     }
 
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
@@ -352,11 +424,16 @@ impl Hittable for Box<dyn Hittable + '_> {
 }
 
 impl<T: Hittable> Hittable for HittableList<T> {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
         let mut range = t_range.clone();
         let mut min_interaction: Option<HitInteraction> = None;
         for hittable in &self.hittables {
-            if let Some(hi) = hittable.hit(ray, &range) {
+            if let Some(hi) = hittable.hit(ray, &range, rng) {
                 range.end = hi.t;
                 min_interaction = Some(hi);
             }
@@ -447,16 +524,21 @@ impl BoundingVolumeHierarchy {
 }
 
 impl Hittable for BoundingVolumeHierarchy {
-    fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<HitInteraction> {
+    fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
         if self.aabb.hit(ray, t_range) {
             let mut range = t_range.clone();
             let mut min_interaction: Option<HitInteraction> = None;
-            if let Some(hi) = self.left.hit(ray, &range) {
+            if let Some(hi) = self.left.hit(ray, &range, rng) {
                 range.end = hi.t;
                 min_interaction = Some(hi);
             }
             if let Some(right) = &self.right {
-                if let Some(hi) = right.hit(ray, &range) {
+                if let Some(hi) = right.hit(ray, &range, rng) {
                     range.end = hi.t;
                     min_interaction = Some(hi);
                 }
