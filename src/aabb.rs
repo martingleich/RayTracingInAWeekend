@@ -5,7 +5,7 @@ use crate::{
     ray::Ray,
     vec3::{Dir3, Point3},
 };
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Default, Clone, Copy, PartialEq, Debug)]
 pub struct Aabb {
     pub min: Point3,
     pub max: Point3,

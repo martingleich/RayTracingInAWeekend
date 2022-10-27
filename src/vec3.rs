@@ -91,7 +91,7 @@ impl<T: std::ops::AddAssign<T> + std::default::Default + Copy> std::iter::Sum fo
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct Point3(pub Vec3<f32>);
 
 #[derive(

@@ -5,7 +5,7 @@ use crate::camera::Camera;
 use crate::color::Color;
 use crate::common;
 use crate::hittable::{
-    AxisAlignedBox, Hittable, HittableList, MovingHittable, Rect, Sphere, TransformedHittable, ConstantMedium,
+    AxisAlignedBox, Hittable, HittableList, MovingHittable, Rect, Sphere, TransformedHittable, ConstantMedium, BoundingVolumeHierarchy,
 };
 
 use crate::background_color::BackgroundColor;
@@ -41,8 +41,51 @@ mod create_utils {
         arena.alloc(Material::Isotropic {  albedo: texture })
     }
 }
+
+pub fn create_world_final_scene2<'a>(
+    arena: &'a mut bumpalo::Bump,
+    seed: <common::TRng as SeedableRng>::Seed,
+) -> World<BoundingVolumeHierarchy<AxisAlignedBox>> {
+    let mut rng = common::TRng::from_seed(seed);
+
+    let camera = Camera::build()
+        .vertical_fov(40.0, 1.0)
+        .position(Point3::new(478.0, 278.0, -600.0))
+        .look_at(Dir3::UP, Point3::new(278.0, 278.0, 0.0))
+        .build();
+
+    let ground = solid_lambert(arena, Color::new_rgb(0.48, 0.83, 0.53));
+    let boxes = {
+        let mut boxes = Vec::new();
+        let boxes_per_side = 40;
+        let range = Aabb::new_corners(Point3::new(-1000.0, 0.0, -1000.0), Point3::new(1000.0, 101.0, 1000.0));
+        let width = (range.max.0.e[0] - range.min.0.e[0]) / boxes_per_side as f32;
+        let height = range.max.0.e[1] - range.min.0.e[1];
+        let depth = (range.max.0.e[2] - range.min.0.e[2]) / boxes_per_side as f32;
+        for i in 0..boxes_per_side {
+            for j in 0..boxes_per_side {
+                let min = range.min + Dir3::new(i as f32 * width, 0.0, j as f32 * depth);
+                let max = min + Dir3::new(width, height * rng.gen::<f32>(), depth);
+                let abox = AxisAlignedBox::new(&Aabb::new_corners(min, max), ground);
+                boxes.push(abox);
+            }
+        }
+        boxes
+    };
+    let bvh = BoundingVolumeHierarchy::new(boxes, &camera.time_interval);
+
+    let hittable = bvh;
+
+    World {
+        background: BackgroundColor::Sky,
+        camera,
+        hittable,
+    }
+}
+
 pub fn create_world_cornell_box_smoke<'a>(
     arena: &'a mut bumpalo::Bump,
+    _seed: <common::TRng as SeedableRng>::Seed,
 ) -> World<HittableList<Box<dyn 'a + Hittable>>> {
     let hsize = 278.0;
     let camera = Camera::build()
@@ -164,6 +207,7 @@ pub fn create_world_cornell_box_smoke<'a>(
 
 pub fn create_world_cornell_box<'a>(
     arena: &'a mut bumpalo::Bump,
+    _seed: <common::TRng as SeedableRng>::Seed,
 ) -> World<HittableList<Box<dyn 'a + Hittable>>> {
     let hsize = 278.0;
     let camera = Camera::build()
@@ -280,6 +324,7 @@ pub fn create_world_cornell_box<'a>(
 
 pub fn create_world_simple_plane(
     arena: &mut bumpalo::Bump,
+    _seed: <common::TRng as SeedableRng>::Seed,
 ) -> World<HittableList<Rect>> {
     // A single rectangle with a solid
     let camera = Camera::build()
@@ -315,7 +360,10 @@ pub fn create_world_simple_plane(
     }
 }
 
-pub fn create_world_earth_mapped(arena: &mut bumpalo::Bump) -> World<Sphere> {
+pub fn create_world_earth_mapped(
+    arena: &mut bumpalo::Bump,
+    _seed: <common::TRng as SeedableRng>::Seed,
+) -> World<Sphere> {
     // A single sphere with a image texture
     let camera = Camera::build()
         .vertical_fov(60.0, 16.0/19.0)
@@ -344,6 +392,7 @@ pub fn create_world_earth_mapped(arena: &mut bumpalo::Bump) -> World<Sphere> {
 
 pub fn create_world_moving_spheres<'a>(
     arena: &'a mut bumpalo::Bump,
+    _seed: <common::TRng as SeedableRng>::Seed,
 ) -> World<HittableList<Box<dyn 'a + Hittable>>> {
     // One large sphere as ground,
     // One sphere moving fast from left to right
@@ -490,11 +539,11 @@ pub fn create_world_random_scene(
 }
 
 pub fn create_world_defocus_blur(
-    aspect_ratio: f32,
     arena: &mut bumpalo::Bump,
+    _seed: <common::TRng as SeedableRng>::Seed,
 ) -> World<HittableList<Sphere>> {
     let camera = Camera::build()
-        .vertical_fov(60.0, aspect_ratio)
+        .vertical_fov(60.0, 16.0/9.0)
         .position(Point3::ORIGIN + Dir3::BACKWARD * 3.0 + Dir3::UP * 3.0 + 3.0 * Dir3::RIGHT)
         .look_at_focus(Dir3::UP, Point3::ORIGIN + Dir3::FORWARD)
         .aperture(0.1)

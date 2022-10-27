@@ -1,4 +1,4 @@
-use std::ops::RangeInclusive;
+use std::ops::Range;
 
 use rand_distr::Distribution;
 
@@ -18,7 +18,7 @@ struct ActualCameraBuilder {
     aperture: f32,
     focus_distance: f32,
 
-    time_interval: RangeInclusive<f32>,
+    time_interval: Range<f32>,
     shutter_pace: Vec2f,
 }
 
@@ -48,7 +48,7 @@ impl<S: CameraBuilderState> CameraBuilder<S> {
             up: Dir3::UP,
             position: Point3::ORIGIN,
             shutter_pace: Vec2f::ZERO,
-            time_interval: 0.0..=0.0,
+            time_interval: 0.0..0.0,
         }))
     }
     fn inner_new(data: Box<ActualCameraBuilder>) -> CameraBuilder<S> {
@@ -120,7 +120,7 @@ impl CameraBuilder<Completed> {
     }
 
     pub fn motion_blur(mut self, start: f32, end: f32) -> Self {
-        self.data.time_interval = start..=end;
+        self.data.time_interval = start..end;
         self
     }
     pub fn build(self) -> Camera {
@@ -152,15 +152,15 @@ impl ActualCameraBuilder {
 }
 
 pub struct Camera {
-    position: Point3,
+    pub position: Point3,
     upper_left_corner: Dir3,
-    unit_right: Dir3,
-    unit_up: Dir3,
+    pub unit_right: Dir3,
+    pub unit_up: Dir3,
     scaled_right: Dir3,
     scaled_up: Dir3,
-    lens_radius: f32,
-    time_interval: RangeInclusive<f32>,
-    shutter_pace: Vec2f,
+    pub lens_radius: f32,
+    pub time_interval: Range<f32>,
+    pub shutter_pace: Vec2f,
 }
 
 impl Camera {
@@ -182,7 +182,12 @@ impl Camera {
         };
 
         // Motion blur/rolling shutter
-        let time = rng.gen_range(self.time_interval.clone()) + Vec2f::dot(self.shutter_pace, point);
+        let start_time = if self.time_interval.start == self.time_interval.end {
+            self.time_interval.start
+        } else {
+            rng.gen_range(self.time_interval.clone())
+        };
+        let time = start_time + Vec2f::dot(self.shutter_pace, point);
 
         Ray::new(
             self.position + offset,
