@@ -547,7 +547,8 @@ impl<T: Hittable> BoundingVolumeHierarchy<T> {
         if node > self.items.len() {
             self.items[usize::MAX - node].hit(ray, t_range, rng)
         } else if self.nodes[node].aabb.hit(ray, t_range) {
-            // Check the sides in the order in which the ray points(i.e. ray points from left to right -> first check left, then)
+            // Check the sides in the order in which the ray points(i.e. ray points from left to right -> first check left, then right)
+            // We still have to check both sides, so we can correctly handle elements on the seperator(TODO: Add these elements to both sides)
             if ray.direction.0.e[self.nodes[node].axis_id] > 0.0 {
                 let interaction1 = self._hit(self.nodes[node].left, ray, t_range, rng);
                 if let Some(hi) = &interaction1 {
