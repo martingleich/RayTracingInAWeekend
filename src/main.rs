@@ -31,14 +31,15 @@ use worlds::World;
 
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
-    let image_size = Size2i::new(800, 800);
-    let samples_per_pixel = 2000;
+    let image_width = 800;
+    let samples_per_pixel = 200;
     let max_depth = 50;
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_cornell_box_smoke(image_size.aspect_ratio(), &mut arena);
+    let world = worlds::create_world_cornell_box_smoke(&mut arena);
+    let image_size = Size2i::new(image_width, (image_width as f32 * world.camera.aspect_ratio()) as i32);
 
     let pixels = render(
         image_size,

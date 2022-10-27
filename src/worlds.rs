@@ -42,12 +42,11 @@ mod create_utils {
     }
 }
 pub fn create_world_cornell_box_smoke<'a>(
-    aspect_ratio: f32,
     arena: &'a mut bumpalo::Bump,
 ) -> World<HittableList<Box<dyn 'a + Hittable>>> {
     let hsize = 278.0;
     let camera = Camera::build()
-        .vertical_fov(40.0, aspect_ratio)
+        .vertical_fov(40.0, 1.0)
         .position(Point3::new(hsize, hsize, -800.0))
         .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
         .build();
@@ -164,12 +163,11 @@ pub fn create_world_cornell_box_smoke<'a>(
 }
 
 pub fn create_world_cornell_box<'a>(
-    aspect_ratio: f32,
     arena: &'a mut bumpalo::Bump,
 ) -> World<HittableList<Box<dyn 'a + Hittable>>> {
     let hsize = 278.0;
     let camera = Camera::build()
-        .vertical_fov(40.0, aspect_ratio)
+        .vertical_fov(40.0, 1.0)
         .position(Point3::new(hsize, hsize, -800.0))
         .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
         .build();
@@ -281,12 +279,11 @@ pub fn create_world_cornell_box<'a>(
 }
 
 pub fn create_world_simple_plane(
-    aspect_ratio: f32,
     arena: &mut bumpalo::Bump,
 ) -> World<HittableList<Rect>> {
     // A single rectangle with a solid
     let camera = Camera::build()
-        .vertical_fov(60.0, aspect_ratio)
+        .vertical_fov(60.0, 16.0/9.0)
         .position(Point3::new(0.0, 6.0, 10.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
@@ -318,10 +315,10 @@ pub fn create_world_simple_plane(
     }
 }
 
-pub fn create_world_earth_mapped(aspect_ratio: f32, arena: &mut bumpalo::Bump) -> World<Sphere> {
+pub fn create_world_earth_mapped(arena: &mut bumpalo::Bump) -> World<Sphere> {
     // A single sphere with a image texture
     let camera = Camera::build()
-        .vertical_fov(60.0, aspect_ratio)
+        .vertical_fov(60.0, 16.0/19.0)
         .position(Point3::new(0.0, 2.0, 10.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
@@ -346,7 +343,6 @@ pub fn create_world_earth_mapped(aspect_ratio: f32, arena: &mut bumpalo::Bump) -
 }
 
 pub fn create_world_moving_spheres<'a>(
-    aspect_ratio: f32,
     arena: &'a mut bumpalo::Bump,
 ) -> World<HittableList<Box<dyn 'a + Hittable>>> {
     // One large sphere as ground,
@@ -354,7 +350,7 @@ pub fn create_world_moving_spheres<'a>(
     // One sphere moving fast fro up to down
 
     let camera = Camera::build()
-        .vertical_fov(60.0, aspect_ratio)
+        .vertical_fov(60.0, 16.0/19.0)
         .position(Point3::new(0.0, 2.0, 10.0))
         .look_at(Dir3::UP, Point3::new(0.0, 2.0, 0.0))
         .motion_blur(0.0, 0.5)
@@ -411,12 +407,11 @@ pub fn create_world_moving_spheres<'a>(
 }
 
 pub fn create_world_random_scene(
-    aspect_ratio: f32,
     arena: &mut bumpalo::Bump,
     seed: <common::TRng as SeedableRng>::Seed,
 ) -> World<HittableList<Sphere>> {
     let camera = Camera::build()
-        .vertical_fov(60.0, aspect_ratio)
+        .vertical_fov(60.0, 16.0/9.0)
         .position(Point3::new(13.0, 2.0, 3.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .focus_distance(10.0)

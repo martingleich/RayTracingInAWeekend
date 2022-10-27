@@ -168,6 +168,10 @@ impl Camera {
         CameraBuilder::<Initial>::new()
     }
 
+    pub fn aspect_ratio(&self) -> f32 {
+        self.scaled_up.length() / self.scaled_right.length()
+    }
+
     pub fn ray<TRng: rand::Rng>(&self, rng: &mut TRng, point: Vec2f) -> Ray {
         // Defocus blur
         let offset = if self.lens_radius > 0.0 {
