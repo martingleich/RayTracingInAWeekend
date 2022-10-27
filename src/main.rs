@@ -34,7 +34,8 @@ fn main() -> Result<(), ImageError> {
     let image_width = 800;
     let samples_per_pixel = 1;
     let max_depth = 50;
-    let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
+    //let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
+    let thread_count = 1;
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();

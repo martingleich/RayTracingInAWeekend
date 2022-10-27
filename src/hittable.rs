@@ -1,4 +1,4 @@
-use std::{ops::Range};
+use std::{ops::Range, sync::atomic::AtomicI64};
 
 use rand::Rng;
 
@@ -393,21 +393,6 @@ impl<'a, T: Hittable> Hittable for ConstantMedium<'a, T> {
     }
 }
 
-pub struct HittableList<T: Hittable> {
-    hittables: Vec<T>,
-}
-
-impl<T: Hittable> HittableList<T> {
-    pub fn new() -> Self {
-        Self {
-            hittables: Vec::new(),
-        }
-    }
-    pub fn push(&mut self, hittable: T) {
-        self.hittables.push(hittable);
-    }
-}
-
 impl Hittable for Box<dyn Hittable + '_> {
     fn hit(
         &self,
@@ -485,11 +470,12 @@ impl<T : Hittable> BoundingVolumeHierarchy<T> {
             x
         }).collect::<Vec<_>>();
         let mut nodes = Vec::<BoundingVolumeNode>::new();
-        let (initial_index, _) = Self::_new(&mut hittables[..], &mut nodes, 0);
+        let (initial_index, _, _) = Self::_new(&mut hittables[..], &mut nodes, 0, 0);
+        //eprint!("{depth}");
         Self {
             items,
             nodes,
-            initial_index
+            initial_index,
         }
     }
 
@@ -497,9 +483,10 @@ impl<T : Hittable> BoundingVolumeHierarchy<T> {
         hittables: &mut [(usize, Aabb)],
         nodes : &mut Vec<BoundingVolumeNode>,
         axis_id: usize,
-    ) -> (usize, Aabb) {
+        depth : usize,
+    ) -> (usize, Aabb, usize) {
         if hittables.len() == 1 {
-            hittables[0]
+            (hittables[0].0, hittables[0].1, depth)
         } else {
             let comparer =
                 |a: &Aabb, b: &Aabb| a.min.0.e[axis_id].partial_cmp(&b.min.0.e[axis_id]).unwrap();
@@ -512,20 +499,20 @@ impl<T : Hittable> BoundingVolumeHierarchy<T> {
                     left: hittables[0].0,
                     right: hittables[1].0
                 });
-                (result_id, aabb)
+                (result_id, aabb, depth)
             } else {
                 let mid = hittables.len() / 2;
                 let (left_half, right_half) = hittables.split_at_mut(mid);
                 let result_id = nodes.len();
                 nodes.push(Default::default());
-                let (left_id, left_aabb) = Self::_new(left_half, nodes, (axis_id + left_half.len()) % 3);
-                let (right_id, right_aabb) = Self::_new(right_half, nodes, (axis_id + right_half.len()) % 3);
+                let (left_id, left_aabb, left_depth) = Self::_new(left_half, nodes, (axis_id + left_half.len()) % 3, depth + 1);
+                let (right_id, right_aabb, right_depth) = Self::_new(right_half, nodes, (axis_id + right_half.len()) % 3, depth + 1);
                 let aabb = Aabb::new_surrounding_boxes(&[left_aabb, right_aabb]);
                 nodes[result_id] = BoundingVolumeNode{
                     aabb,
                     left: left_id,
                     right: right_id};
-                (result_id, aabb)
+                (result_id, aabb, left_depth.max(right_depth))
             }
         }
     }
@@ -537,11 +524,11 @@ impl<T : Hittable> BoundingVolumeHierarchy<T> {
             if self.nodes[node].aabb.hit(ray, t_range) {
                 let mut min_interaction: Option<HitInteraction> = None;
                 if let Some(hi) = self._hit(self.nodes[node].left, ray, t_range, rng) {
-                    t_range.end = hi.t;
+                    t_range.start = hi.t;
                     min_interaction = Some(hi);
                 }
                 if let Some(hi) = self._hit(self.nodes[node].right, ray, t_range, rng) {
-                    t_range.end = hi.t;
+                    t_range.start = hi.t;
                     min_interaction = Some(hi);
                 }
                 min_interaction

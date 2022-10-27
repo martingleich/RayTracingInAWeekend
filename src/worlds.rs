@@ -5,7 +5,7 @@ use crate::camera::Camera;
 use crate::color::Color;
 use crate::common;
 use crate::hittable::{
-    AxisAlignedBox, Hittable, HittableList, MovingHittable, Rect, Sphere, TransformedHittable, ConstantMedium, BoundingVolumeHierarchy,
+    AxisAlignedBox, Hittable, MovingHittable, Rect, Sphere, TransformedHittable, ConstantMedium, BoundingVolumeHierarchy,
 };
 
 use crate::background_color::BackgroundColor;
@@ -45,7 +45,7 @@ mod create_utils {
 pub fn create_world_final_scene2<'a>(
     arena: &'a mut bumpalo::Bump,
     seed: <common::TRng as SeedableRng>::Seed,
-) -> World<BoundingVolumeHierarchy<AxisAlignedBox>> {
+) -> World<impl Hittable +'_> {
     let mut rng = common::TRng::from_seed(seed);
 
     let camera = Camera::build()
@@ -72,9 +72,9 @@ pub fn create_world_final_scene2<'a>(
         }
         boxes
     };
-    let bvh = BoundingVolumeHierarchy::new(boxes, &camera.time_interval);
 
-    let hittable = bvh;
+    let hittable = BoundingVolumeHierarchy::new(boxes, &camera.time_interval);
+    //let hittable = boxes;
 
     World {
         background: BackgroundColor::Sky,
@@ -86,7 +86,7 @@ pub fn create_world_final_scene2<'a>(
 pub fn create_world_cornell_box_smoke<'a>(
     arena: &'a mut bumpalo::Bump,
     _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<Vec<Box<dyn 'a + Hittable>>> {
+) -> World<impl Hittable +'_> {
     let hsize = 278.0;
     let camera = Camera::build()
         .vertical_fov(40.0, 1.0)
@@ -208,7 +208,7 @@ pub fn create_world_cornell_box_smoke<'a>(
 pub fn create_world_cornell_box<'a>(
     arena: &'a mut bumpalo::Bump,
     _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<Vec<Box<dyn 'a + Hittable>>> {
+) -> World<impl Hittable +'_> {
     let hsize = 278.0;
     let camera = Camera::build()
         .vertical_fov(40.0, 1.0)
@@ -325,10 +325,10 @@ pub fn create_world_cornell_box<'a>(
 pub fn create_world_simple_plane(
     arena: &mut bumpalo::Bump,
     _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<Vec<Rect>> {
+) -> World<impl Hittable +'_> {
     // A single rectangle with a solid
     let camera = Camera::build()
-        .vertical_fov(60.0, 16.0/9.0)
+        .vertical_fov(60.0, 9.0/16.0)
         .position(Point3::new(0.0, 6.0, 10.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
@@ -363,7 +363,7 @@ pub fn create_world_simple_plane(
 pub fn create_world_earth_mapped(
     arena: &mut bumpalo::Bump,
     _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<Sphere> {
+) -> World<impl Hittable +'_> {
     // A single sphere with a image texture
     let camera = Camera::build()
         .vertical_fov(60.0, 16.0/19.0)
@@ -393,7 +393,7 @@ pub fn create_world_earth_mapped(
 pub fn create_world_moving_spheres<'a>(
     arena: &'a mut bumpalo::Bump,
     _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<Vec<Box<dyn 'a + Hittable>>> {
+) -> World<impl Hittable +'_> {
     // One large sphere as ground,
     // One sphere moving fast from left to right
     // One sphere moving fast fro up to down
@@ -458,9 +458,9 @@ pub fn create_world_moving_spheres<'a>(
 pub fn create_world_random_scene(
     arena: &mut bumpalo::Bump,
     seed: <common::TRng as SeedableRng>::Seed,
-) -> World<Vec<Sphere>> {
+) -> World<impl Hittable +'_> {
     let camera = Camera::build()
-        .vertical_fov(60.0, 16.0/9.0)
+        .vertical_fov(60.0, 9.0/16.0)
         .position(Point3::new(13.0, 2.0, 3.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .focus_distance(10.0)
@@ -541,9 +541,9 @@ pub fn create_world_random_scene(
 pub fn create_world_defocus_blur(
     arena: &mut bumpalo::Bump,
     _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<Vec<Sphere>> {
+) -> World<impl Hittable +'_> {
     let camera = Camera::build()
-        .vertical_fov(60.0, 16.0/9.0)
+        .vertical_fov(60.0, 9.0/16.0)
         .position(Point3::ORIGIN + Dir3::BACKWARD * 3.0 + Dir3::UP * 3.0 + 3.0 * Dir3::RIGHT)
         .look_at_focus(Dir3::UP, Point3::ORIGIN + Dir3::FORWARD)
         .aperture(0.1)
