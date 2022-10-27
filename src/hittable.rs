@@ -1,4 +1,4 @@
-use std::{ops::Range, sync::atomic::AtomicI64};
+use std::ops::Range;
 
 use rand::Rng;
 
@@ -271,8 +271,8 @@ impl<'a> Hittable for AxisAlignedBox<'a> {
         t_range: &Range<f32>,
         _rng: &mut common::TRng,
     ) -> Option<HitInteraction> {
-
-        let ((near_t, near_plane), (far_t, far_plane)) = self.aabb.intersections_line(ray.origin, ray.direction)?;
+        let ((near_t, near_plane), (far_t, far_plane)) =
+            self.aabb.intersections_line(ray.origin, ray.direction)?;
         let (t, plane) = if t_range.contains(&near_t) {
             (near_t, near_plane)
         } else if t_range.contains(&far_t) {
@@ -281,7 +281,9 @@ impl<'a> Hittable for AxisAlignedBox<'a> {
             return None;
         };
         let position = ray.origin + t * ray.direction;
-        let dir = (position.0.e[plane] - 0.5*(self.aabb.max.0.e[plane] - self.aabb.min.0.e[plane])).signum();
+        let dir = (position.0.e[plane]
+            - 0.5 * (self.aabb.max.0.e[plane] - self.aabb.min.0.e[plane]))
+            .signum();
 
         let mut surface_normal = Dir3::ZERO;
         surface_normal.0.e[plane] = dir;
@@ -343,7 +345,13 @@ pub struct ConstantMedium<'a, T: Hittable> {
 }
 
 impl<'a, T: Hittable> ConstantMedium<'a, T> {
-    pub fn new(boundary: &'a T, phase_function: &'a Material<'a>, density: f32) -> Self { Self { boundary, phase_function, neg_inv_density: -1.0 / density } }
+    pub fn new(boundary: &'a T, phase_function: &'a Material<'a>, density: f32) -> Self {
+        Self {
+            boundary,
+            phase_function,
+            neg_inv_density: -1.0 / density,
+        }
+    }
 }
 
 impl<'a, T: Hittable> Hittable for ConstantMedium<'a, T> {
@@ -355,10 +363,12 @@ impl<'a, T: Hittable> Hittable for ConstantMedium<'a, T> {
     ) -> Option<HitInteraction> {
         let start_boundary = self
             .boundary
-            .hit(ray, &(f32::NEG_INFINITY..f32::INFINITY), rng)?.t;
-        let end_boundary =
-            self.boundary
-                .hit(ray, &(start_boundary + 0.0001..f32::INFINITY), rng)?.t;
+            .hit(ray, &(f32::NEG_INFINITY..f32::INFINITY), rng)?
+            .t;
+        let end_boundary = self
+            .boundary
+            .hit(ray, &(start_boundary + 0.0001..f32::INFINITY), rng)?
+            .t;
 
         let mut start_medium = start_boundary.max(t_range.start);
         let end_medium = end_boundary.min(t_range.end);
@@ -448,27 +458,28 @@ impl<T: Hittable> Hittable for Vec<T> {
 
 #[derive(Default, Debug, Clone, Copy)]
 struct BoundingVolumeNode {
-    aabb : Aabb,
-    left : usize,
-    right : usize,
+    aabb: Aabb,
+    axis_id: usize,
+    left: usize,
+    right: usize,
 }
-pub struct BoundingVolumeHierarchy<T : Hittable> {
-    items : Vec<T>,
-    nodes : Vec<BoundingVolumeNode>,
-    initial_index : usize,
+pub struct BoundingVolumeHierarchy<T: Hittable> {
+    items: Vec<T>,
+    nodes: Vec<BoundingVolumeNode>,
+    initial_index: usize,
 }
 
-impl<T : Hittable> BoundingVolumeHierarchy<T> {
-    pub fn new(
-        items: Vec<T>,
-        time_range: &Range<f32>,
-    ) -> Self {
-        let mut hittables = items.iter().map(|h| {
-            h.bounding_box(time_range).unwrap()
-        }).enumerate().map(|mut x| {
-            x.0 = usize::MAX - x.0;
-            x
-        }).collect::<Vec<_>>();
+impl<T: Hittable> BoundingVolumeHierarchy<T> {
+    pub fn new(items: Vec<T>, time_range: &Range<f32>) -> Self {
+        let mut hittables = items
+            .iter()
+            .map(|h| h.bounding_box(time_range).unwrap())
+            .enumerate()
+            .map(|mut x| {
+                x.0 = usize::MAX - x.0;
+                x
+            })
+            .collect::<Vec<_>>();
         let mut nodes = Vec::<BoundingVolumeNode>::new();
         let (initial_index, _, _) = Self::_new(&mut hittables[..], &mut nodes, 0, 0);
         //eprint!("{depth}");
@@ -481,9 +492,9 @@ impl<T : Hittable> BoundingVolumeHierarchy<T> {
 
     fn _new(
         hittables: &mut [(usize, Aabb)],
-        nodes : &mut Vec<BoundingVolumeNode>,
+        nodes: &mut Vec<BoundingVolumeNode>,
         axis_id: usize,
-        depth : usize,
+        depth: usize,
     ) -> (usize, Aabb, usize) {
         if hittables.len() == 1 {
             (hittables[0].0, hittables[0].1, depth)
@@ -494,10 +505,11 @@ impl<T : Hittable> BoundingVolumeHierarchy<T> {
             if hittables.len() == 2 {
                 let result_id = nodes.len();
                 let aabb = Aabb::new_surrounding_boxes(&[hittables[0].1, hittables[1].1]);
-                nodes.push(BoundingVolumeNode{
+                nodes.push(BoundingVolumeNode {
                     aabb,
                     left: hittables[0].0,
-                    right: hittables[1].0
+                    right: hittables[1].0,
+                    axis_id,
                 });
                 (result_id, aabb, depth)
             } else {
@@ -505,41 +517,67 @@ impl<T : Hittable> BoundingVolumeHierarchy<T> {
                 let (left_half, right_half) = hittables.split_at_mut(mid);
                 let result_id = nodes.len();
                 nodes.push(Default::default());
-                let (left_id, left_aabb, left_depth) = Self::_new(left_half, nodes, (axis_id + left_half.len()) % 3, depth + 1);
-                let (right_id, right_aabb, right_depth) = Self::_new(right_half, nodes, (axis_id + right_half.len()) % 3, depth + 1);
+                let (left_id, left_aabb, left_depth) =
+                    Self::_new(left_half, nodes, (axis_id + left_half.len()) % 3, depth + 1);
+                let (right_id, right_aabb, right_depth) = Self::_new(
+                    right_half,
+                    nodes,
+                    (axis_id + right_half.len()) % 3,
+                    depth + 1,
+                );
                 let aabb = Aabb::new_surrounding_boxes(&[left_aabb, right_aabb]);
-                nodes[result_id] = BoundingVolumeNode{
+                nodes[result_id] = BoundingVolumeNode {
                     aabb,
                     left: left_id,
-                    right: right_id};
+                    right: right_id,
+                    axis_id,
+                };
                 (result_id, aabb, left_depth.max(right_depth))
             }
         }
     }
 
-    fn _hit(&self, node : usize, ray: &Ray,t_range: &mut Range<f32>, rng: &mut common::TRng) -> Option<HitInteraction> {
+    fn _hit(
+        &self,
+        node: usize,
+        ray: &Ray,
+        t_range: &mut Range<f32>,
+        rng: &mut common::TRng,
+    ) -> Option<HitInteraction> {
         if node > self.items.len() {
             self.items[usize::MAX - node].hit(ray, t_range, rng)
-        } else {
-            if self.nodes[node].aabb.hit(ray, t_range) {
-                let mut min_interaction: Option<HitInteraction> = None;
-                if let Some(hi) = self._hit(self.nodes[node].left, ray, t_range, rng) {
-                    t_range.start = hi.t;
-                    min_interaction = Some(hi);
+        } else if self.nodes[node].aabb.hit(ray, t_range) {
+            // Check the sides in the order in which the ray points(i.e. ray points from left to right -> first check left, then)
+            if ray.direction.0.e[self.nodes[node].axis_id] > 0.0 {
+                let interaction1 = self._hit(self.nodes[node].left, ray, t_range, rng);
+                if let Some(hi) = &interaction1 {
+                    t_range.end = hi.t;
                 }
-                if let Some(hi) = self._hit(self.nodes[node].right, ray, t_range, rng) {
-                    t_range.start = hi.t;
-                    min_interaction = Some(hi);
+                let interaction2 = self._hit(self.nodes[node].right, ray, t_range, rng);
+                if let Some(hi) = &interaction2 {
+                    t_range.end = hi.t;
+                    return interaction2;
                 }
-                min_interaction
+                interaction1
             } else {
-                None
+                let interaction1 = self._hit(self.nodes[node].right, ray, t_range, rng);
+                if let Some(hi) = &interaction1 {
+                    t_range.end = hi.t;
+                }
+                let interaction2 = self._hit(self.nodes[node].left, ray, t_range, rng);
+                if let Some(hi) = &interaction2 {
+                    t_range.end = hi.t;
+                    return interaction2;
+                }
+                interaction1
             }
+        } else {
+            None
         }
     }
 }
 
-impl<T : Hittable> Hittable for BoundingVolumeHierarchy<T> {
+impl<T: Hittable> Hittable for BoundingVolumeHierarchy<T> {
     fn hit(
         &self,
         ray: &Ray,
@@ -551,6 +589,10 @@ impl<T : Hittable> Hittable for BoundingVolumeHierarchy<T> {
     }
 
     fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
-        if self.initial_index < self.nodes.len() {Some(self.nodes[self.initial_index].aabb)} else {None}
+        if self.initial_index < self.nodes.len() {
+            Some(self.nodes[self.initial_index].aabb)
+        } else {
+            None
+        }
     }
 }

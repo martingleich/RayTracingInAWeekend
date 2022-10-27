@@ -32,15 +32,21 @@ use worlds::World;
 fn main() -> Result<(), ImageError> {
     let path = Path::new("output/image.png");
     let image_width = 800;
-    let samples_per_pixel = 1;
+    let samples_per_pixel = 10;
     let max_depth = 50;
     //let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     let thread_count = 1;
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_final_scene2(&mut arena, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
-    let image_size = Size2i::new(image_width, (image_width as f32 * world.camera.aspect_ratio()) as i32);
+    let world = worlds::create_world_final_scene2(
+        &mut arena,
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    );
+    let image_size = Size2i::new(
+        image_width,
+        (image_width as f32 * world.camera.aspect_ratio()) as i32,
+    );
 
     let pixels = render(
         image_size,
