@@ -1,4 +1,4 @@
-use std::{ops::Range, num::Wrapping};
+use std::{ops::Range};
 
 use rand::Rng;
 
@@ -423,7 +423,7 @@ impl Hittable for Box<dyn Hittable + '_> {
     }
 }
 
-impl<T: Hittable> Hittable for HittableList<T> {
+impl<T: Hittable> Hittable for Vec<T> {
     fn hit(
         &self,
         ray: &Ray,
@@ -432,7 +432,7 @@ impl<T: Hittable> Hittable for HittableList<T> {
     ) -> Option<HitInteraction> {
         let mut range = t_range.clone();
         let mut min_interaction: Option<HitInteraction> = None;
-        for hittable in &self.hittables {
+        for hittable in self {
             if let Some(hi) = hittable.hit(ray, &range, rng) {
                 range.end = hi.t;
                 min_interaction = Some(hi);
@@ -446,7 +446,7 @@ impl<T: Hittable> Hittable for HittableList<T> {
         // Empty list -> None
         // else reduce(AABB::new_surounding)
         let mut result: Option<Aabb> = None;
-        for hittable in &self.hittables {
+        for hittable in self {
             if let Some(aabb) = &hittable.bounding_box(time_range) {
                 if let Some(old) = &result {
                     result = Some(Aabb::new_surrounding_boxes(&[*old, *aabb]))
