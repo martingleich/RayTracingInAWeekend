@@ -13,7 +13,7 @@ use crate::background_color::BackgroundColor;
 use crate::material::Material;
 use crate::perlin::Perlin;
 use crate::texture::Texture;
-use crate::transformations::{RotationAroundUp, Translation};
+use crate::transformations::{RotationAroundUp, Transformation, Translation};
 use crate::vec3::{Dir3, Point3};
 
 use self::create_utils::{glass, smoke, solid_diffuse_light, solid_metal};
@@ -64,6 +64,7 @@ pub fn create_world_final_scene2<'a>(
         .vertical_fov(40.0, 1.0)
         .position(Point3::new(478.0, 278.0, -600.0))
         .look_at(Dir3::UP, Point3::new(278.0, 278.0, 0.0))
+        .motion_blur(0.0, 1.0)
         .build();
 
     let material_ground = solid_lambert(arena, Color::new_rgb(0.48, 0.83, 0.53));
@@ -99,14 +100,82 @@ pub fn create_world_final_scene2<'a>(
 
     let material_glass = glass(arena, 1.5);
     let material_metal = solid_metal(arena, Color::new_rgb(0.8, 0.8, 0.9), 1.0);
+    let texture_marble = arena.alloc(Texture::Marble {
+        scale: 0.1,
+        noise: Perlin::new(8, &mut rng),
+    });
+    let material_marble = arena.alloc(Material::Lambert {
+        albedo: texture_marble,
+    });
+    let texture_earth = {
+        let path = std::path::Path::new("input/earthmap.jpg");
+        let file = std::fs::OpenOptions::new().read(true).open(path).unwrap();
+        let reader = std::io::BufReader::new(file);
+        let image = arena.alloc(image::load(reader, image::ImageFormat::Jpeg).unwrap());
+        arena.alloc(Texture::Image {
+            image: image.as_rgb8().unwrap(),
+        })
+    };
+    let material_earth = arena.alloc(Material::Lambert {
+        albedo: texture_earth,
+    });
+    let obj_fog_glass = Sphere::new(Point3::new(360.0, 150.0, 145.0), 70.0, material_glass);
+    let obj_fog_glass2 = arena.alloc(obj_fog_glass.clone());
+    let material_fog = smoke(arena, Color::new_rgb(0.2, 0.4, 0.9));
+    let obj_fog_sphere = ConstantMedium::new(obj_fog_glass2, material_fog, 0.2);
 
     let spheres: Vec<Sphere> = vec![
         Sphere::new(Point3::new(260.0, 150.0, 45.0), 50.0, material_glass),
+        obj_fog_glass,
         Sphere::new(Point3::new(0.0, 150.0, 145.0), 50.0, material_metal),
+        Sphere::new(Point3::new(220.0, 280.0, 300.0), 80.0, material_marble),
+        Sphere::new(Point3::new(400.0, 200.0, 400.0), 100.0, material_earth),
     ];
 
-    let hittable: Vec<Box<dyn Hittable>> =
-        vec![Box::new(boxes), Box::new(light), Box::new(spheres)];
+    let moving_sphere = {
+        let material_moving_sphere = solid_lambert(arena, Color::new_rgb(0.7, 0.3, 0.1));
+        let sphere = arena.alloc(Sphere::new(
+            Point3::new(400.0, 400.0, 200.0),
+            50.0,
+            material_moving_sphere,
+        ));
+        MovingHittable::new(sphere, Dir3::new(30.0, 0.0, 0.0))
+    };
+
+    let obj_sphere_cube = {
+        let material = solid_lambert(arena, Color::new_rgb(0.75, 0.75, 0.75));
+        let mut spheres = Vec::new();
+        let rot = RotationAroundUp::new(15.0);
+        let mut dir_1 = Dir3::RIGHT;
+        let mut dir_2 = Dir3::UP;
+        let mut dir_3 = Dir3::FORWARD;
+        rot.apply_dir(&mut dir_1);
+        rot.apply_dir(&mut dir_2);
+        rot.apply_dir(&mut dir_3);
+        let origin = Point3::new(-100.0, 270.0, 395.0);
+        for _ in 0..1000 {
+            let rnd = rng.gen::<[f32; 3]>();
+            let p = origin + 165.0 * (dir_1 * rnd[0] + dir_2 * rnd[1] + dir_3 * rnd[2]);
+            spheres.push(Sphere::new(p, 10.0, material));
+        }
+        BoundingVolumeHierarchy::new(spheres, &camera.time_interval)
+    };
+
+    let obj_fog = {
+        let boundary = arena.alloc(Sphere::new(Point3::ORIGIN, 5000.0, material_fog));
+        let material_fog = smoke(arena, Color::new_rgb(1.0, 1.0, 1.0));
+        ConstantMedium::new(boundary, material_fog, 0.0001)
+    };
+
+    let hittable: Vec<Box<dyn Hittable>> = vec![
+        Box::new(boxes),
+        Box::new(light),
+        Box::new(spheres),
+        Box::new(moving_sphere),
+        Box::new(obj_fog_sphere),
+        Box::new(obj_sphere_cube),
+        Box::new(obj_fog),
+    ];
     World {
         background: BackgroundColor::Solid {
             color: Color::BLACK,
@@ -218,7 +287,7 @@ pub fn create_world_cornell_box_smoke<'a>(
             ));
             let box1_rot = arena.alloc(TransformedHittable {
                 hittable: box1_base,
-                transformation: RotationAroundUp::new(-15.0),
+                transformation: RotationAroundUp::new(15.0),
             });
             let box1 = arena.alloc(TransformedHittable {
                 hittable: box1_rot,
@@ -237,7 +306,7 @@ pub fn create_world_cornell_box_smoke<'a>(
             ));
             let box2_rot = arena.alloc(TransformedHittable {
                 hittable: box2_base,
-                transformation: RotationAroundUp::new(18.0),
+                transformation: RotationAroundUp::new(-18.0),
             });
             let box2 = arena.alloc(TransformedHittable {
                 hittable: box2_rot,
@@ -329,7 +398,7 @@ pub fn create_world_cornell_box<'a>(
             ));
             let box1_rot = arena.alloc(TransformedHittable {
                 hittable: box1_base,
-                transformation: RotationAroundUp::new(-15.0),
+                transformation: RotationAroundUp::new(15.0),
             });
             let box1 = TransformedHittable {
                 hittable: box1_rot,
@@ -348,7 +417,7 @@ pub fn create_world_cornell_box<'a>(
             ));
             let box2_rot = arena.alloc(TransformedHittable {
                 hittable: box2_base,
-                transformation: RotationAroundUp::new(18.0),
+                transformation: RotationAroundUp::new(-18.0),
             });
             let box2 = TransformedHittable {
                 hittable: box2_rot,

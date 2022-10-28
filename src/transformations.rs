@@ -44,12 +44,12 @@ impl RotationAroundUp {
 }
 
 fn rotate_around_up(rot: &RotationAroundUp, c: &mut Vec3<f32>) {
-    c.e[0] = rot.cos_angle * c.e[0] - rot.sin_angle * c.e[2];
-    c.e[2] = rot.sin_angle * c.e[0] + rot.cos_angle * c.e[2];
-}
-fn inv_rotate_around_up(rot: &RotationAroundUp, c: &mut Vec3<f32>) {
     c.e[0] = rot.cos_angle * c.e[0] + rot.sin_angle * c.e[2];
     c.e[2] = -rot.sin_angle * c.e[0] + rot.cos_angle * c.e[2];
+}
+fn inv_rotate_around_up(rot: &RotationAroundUp, c: &mut Vec3<f32>) {
+    c.e[0] = rot.cos_angle * c.e[0] - rot.sin_angle * c.e[2];
+    c.e[2] = rot.sin_angle * c.e[0] + rot.cos_angle * c.e[2];
 }
 impl Transformation for RotationAroundUp {
     fn apply_point(&self, point: &mut Point3) {

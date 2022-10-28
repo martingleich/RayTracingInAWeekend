@@ -91,9 +91,7 @@ impl Perlin {
     }
 
     fn generate_per(bits: usize, rng: &mut TRng) -> Vec<u32> {
-        let mut result = (0..(1 << bits) as u32)
-            .into_iter()
-            .collect::<Vec<_>>();
+        let mut result = (0..(1 << bits) as u32).into_iter().collect::<Vec<_>>();
         result.shuffle(rng);
         result
     }
