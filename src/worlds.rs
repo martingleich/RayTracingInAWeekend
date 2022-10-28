@@ -16,7 +16,7 @@ use crate::texture::Texture;
 use crate::transformations::{RotationAroundUp, Translation};
 use crate::vec3::{Dir3, Point3};
 
-use self::create_utils::{smoke, solid_diffuse_light, glass, solid_metal};
+use self::create_utils::{glass, smoke, solid_diffuse_light, solid_metal};
 use crate::worlds::create_utils::solid_lambert;
 
 pub struct World<T: Hittable> {
@@ -35,7 +35,7 @@ mod create_utils {
 
     pub fn solid_metal(arena: &bumpalo::Bump, color: Color, fuzz: f32) -> &Material {
         let albedo = arena.alloc(Texture::Solid { color });
-        arena.alloc(Material::Metal { albedo, fuzz: fuzz })
+        arena.alloc(Material::Metal { albedo, fuzz })
     }
 
     pub fn solid_diffuse_light(arena: &bumpalo::Bump, color: Color) -> &Material {
@@ -48,7 +48,9 @@ mod create_utils {
         arena.alloc(Material::Isotropic { albedo })
     }
     pub fn glass(arena: &bumpalo::Bump, index_of_refraction: f32) -> &Material {
-        arena.alloc(Material::Dielectric { index_of_refraction })
+        arena.alloc(Material::Dielectric {
+            index_of_refraction,
+        })
     }
 }
 
@@ -86,21 +88,29 @@ pub fn create_world_final_scene2<'a>(
         boxes
     };
     let boxes = BoundingVolumeHierarchy::new(boxes, &camera.time_interval);
-    
+
     let material_light = solid_diffuse_light(arena, Color::new_rgb(7.0, 7.0, 7.0));
-    let light = Rect::new_xz(Point3::new(273.0, 554.0, 279.0), 300.0, 300.0, material_light);
-    
+    let light = Rect::new_xz(
+        Point3::new(273.0, 554.0, 279.0),
+        300.0,
+        300.0,
+        material_light,
+    );
+
     let material_glass = glass(arena, 1.5);
     let material_metal = solid_metal(arena, Color::new_rgb(0.8, 0.8, 0.9), 1.0);
 
-    let spheres : Vec<Sphere> = vec![
+    let spheres: Vec<Sphere> = vec![
         Sphere::new(Point3::new(260.0, 150.0, 45.0), 50.0, material_glass),
-        Sphere::new(Point3::new(0.0, 150.0, 145.0), 50.0, material_metal)
-        ];
+        Sphere::new(Point3::new(0.0, 150.0, 145.0), 50.0, material_metal),
+    ];
 
-    let hittable : Vec<Box<dyn Hittable>> = vec![Box::new(boxes), Box::new(light), Box::new(spheres)];
+    let hittable: Vec<Box<dyn Hittable>> =
+        vec![Box::new(boxes), Box::new(light), Box::new(spheres)];
     World {
-        background: BackgroundColor::Solid { color: Color::BLACK },
+        background: BackgroundColor::Solid {
+            color: Color::BLACK,
+        },
         camera,
         hittable,
     }
@@ -113,22 +123,27 @@ pub fn create_world_perlin_spheres<'a>(
     let mut rng = common::TRng::from_seed(seed);
 
     let camera = Camera::build()
-        .vertical_fov(40.0, 3.0/4.0)
+        .vertical_fov(40.0, 3.0 / 4.0)
         .position(Point3::new(13.0, 2.0, 3.0))
         .look_at(Dir3::UP, Point3::new(0.0, 0.0, 0.0))
         .build();
 
-    let texture_noise = arena.alloc(Texture::Noise { noise: Perlin::new(8, &mut rng) });
-    let material_noise = arena.alloc(Material::Lambert { albedo: texture_noise });
+    let texture_noise = arena.alloc(Texture::Marble {
+        noise: Perlin::new(8, &mut rng),
+        scale: 4.0,
+    });
+    let material_noise = arena.alloc(Material::Lambert {
+        albedo: texture_noise,
+    });
     let hittable = vec![
         Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, material_noise),
         Sphere::new(Point3::new(0.0, 2.0, 0.0), 2.0, material_noise),
-        ];
+    ];
     World {
         background: BackgroundColor::Sky,
         camera,
         hittable,
-    }     
+    }
 }
 
 pub fn create_world_cornell_box_smoke<'a>(

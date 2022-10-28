@@ -1,4 +1,4 @@
-use crate::{color::Color, hittable::HitInteraction, vec3::Point3, perlin::Perlin};
+use crate::{color::Color, hittable::HitInteraction, perlin::Perlin, vec3::Point3};
 
 #[derive(Debug, Clone)]
 pub enum Texture<'a> {
@@ -10,8 +10,9 @@ pub enum Texture<'a> {
         even: &'a Texture<'a>,
         odd: &'a Texture<'a>,
     },
-    Noise {
-        noise : Perlin,
+    Marble {
+        scale: f32,
+        noise: Perlin,
     },
     Image {
         image: &'a image::RgbImage,
@@ -40,9 +41,14 @@ impl<'a> Texture<'a> {
 
                 Color::new_rgb8(image.get_pixel(pix_u, pix_v).0)
             }
-            Texture::Noise { noise } => {
-                noise.sample(interaction.position) * Color::new_rgb(1.0, 1.0, 1.0)
-            },
+            Texture::Marble { scale, noise } => {
+                Color::new_rgb(1.0, 1.0, 1.0)
+                    * 0.5
+                    * (1.0
+                        + (interaction.position.0.e[2] * *scale
+                            + 10.0 * noise.turbulence(interaction.position, 7, 0.5))
+                        .sin())
+            }
         }
     }
 }

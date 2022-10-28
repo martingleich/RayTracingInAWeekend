@@ -7,6 +7,7 @@ mod common;
 mod hittable;
 mod material;
 mod math;
+mod perlin;
 mod ray;
 mod size2i;
 mod texture;
@@ -14,7 +15,6 @@ mod transformations;
 mod vec2;
 mod vec3;
 mod worlds;
-mod perlin;
 
 use std::{path::Path, sync::mpsc, thread};
 
