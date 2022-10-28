@@ -318,11 +318,12 @@ impl<'a, THit: Hittable, TTrans: Transformation> Hittable
     ) -> Option<HitInteraction> {
         // Instead of transforming the object the just move the ray backward
         let mut moved_ray = *ray;
-        self.transformation.reverse_point(&mut moved_ray.origin);
-        self.transformation.reverse_dir(&mut moved_ray.direction);
+        self.transformation.reverse_point_mut(&mut moved_ray.origin);
+        self.transformation
+            .reverse_dir_mut(&mut moved_ray.direction);
         self.hittable.hit(&moved_ray, t_range, rng).map(|mut f| {
-            self.transformation.apply_point(&mut f.position);
-            self.transformation.apply_dir(&mut f.normal);
+            self.transformation.apply_point_mut(&mut f.position);
+            self.transformation.apply_dir_mut(&mut f.normal);
             f
         })
     }
@@ -331,7 +332,7 @@ impl<'a, THit: Hittable, TTrans: Transformation> Hittable
         self.hittable.bounding_box(time_range).map(|b| {
             let corners = b.corners();
             for mut c in corners {
-                self.transformation.apply_point(&mut c)
+                self.transformation.apply_point_mut(&mut c)
             }
             Aabb::new_surrounding_points(&corners)
         })
@@ -366,10 +367,7 @@ impl<'a, T: Hittable> Hittable for ConstantMedium<'a, T> {
             .hit(ray, &(f32::NEG_INFINITY..f32::INFINITY), rng)?
             .t;
         let next = start_boundary + 0.001;
-        let end_boundary = self
-            .boundary
-            .hit(ray, &(next..f32::INFINITY), rng)?
-            .t;
+        let end_boundary = self.boundary.hit(ray, &(next..f32::INFINITY), rng)?.t;
 
         let mut start_medium = start_boundary.max(t_range.start);
         let end_medium = end_boundary.min(t_range.end);

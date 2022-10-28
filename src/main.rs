@@ -31,7 +31,7 @@ use vec2::Vec2f;
 use worlds::World;
 
 fn main() -> Result<(), ImageError> {
-    let args : Vec<String> = std::env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
 
     let path = Path::new(&args[1]);
     let image_width = args[2].parse::<i32>().unwrap(); // 800
@@ -42,7 +42,7 @@ fn main() -> Result<(), ImageError> {
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_final_scene2(
+    let world = worlds::create_world_cornell_box(
         &mut arena,
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
     );

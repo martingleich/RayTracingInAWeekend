@@ -146,12 +146,9 @@ pub fn create_world_final_scene2<'a>(
         let material = solid_lambert(arena, Color::new_rgb(0.75, 0.75, 0.75));
         let mut spheres = Vec::new();
         let rot = RotationAroundUp::new(15.0);
-        let mut dir_1 = Dir3::RIGHT;
-        let mut dir_2 = Dir3::UP;
-        let mut dir_3 = Dir3::FORWARD;
-        rot.apply_dir(&mut dir_1);
-        rot.apply_dir(&mut dir_2);
-        rot.apply_dir(&mut dir_3);
+        let dir_1 = rot.apply_dir(Dir3::RIGHT);
+        let dir_2 = rot.apply_dir(Dir3::UP);
+        let dir_3 = rot.apply_dir(Dir3::FORWARD);
         let origin = Point3::new(-100.0, 270.0, 395.0);
         for _ in 0..1000 {
             let rnd = rng.gen::<[f32; 3]>();
