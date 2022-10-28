@@ -7,7 +7,7 @@ use crate::vec3::Dir3;
 use rand::Rng;
 use rand_distr::{Distribution, UnitBall, UnitSphere};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Material<'a> {
     Lambert { albedo: &'a Texture<'a> },
     Metal { albedo: &'a Texture<'a>, fuzz: f32 },

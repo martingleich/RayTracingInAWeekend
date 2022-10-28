@@ -1,6 +1,6 @@
-use crate::{color::Color, hittable::HitInteraction, vec3::Point3};
+use crate::{color::Color, hittable::HitInteraction, vec3::Point3, perlin::Perlin};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Texture<'a> {
     Solid {
         color: Color,
@@ -10,6 +10,9 @@ pub enum Texture<'a> {
         even: &'a Texture<'a>,
         odd: &'a Texture<'a>,
     },
+    Noise {
+        noise : Perlin,
+    },
     Image {
         image: &'a image::RgbImage,
     },
@@ -17,14 +20,14 @@ pub enum Texture<'a> {
 
 impl<'a> Texture<'a> {
     pub fn sample(&self, interaction: &HitInteraction) -> Color {
-        match *self {
-            Texture::Solid { color } => color,
+        match self {
+            Texture::Solid { color } => *color,
             Texture::Checker {
                 inv_frequency: frequency,
                 even,
                 odd,
             } => {
-                let s = (interaction.position - Point3::ORIGIN) * frequency;
+                let s = (interaction.position - Point3::ORIGIN) * *frequency;
                 let sines = s.right().sin() * s.up().sin() * s.forward().sin();
                 let t = if sines < 0.0 { even } else { odd };
                 t.sample(interaction)
@@ -37,6 +40,9 @@ impl<'a> Texture<'a> {
 
                 Color::new_rgb8(image.get_pixel(pix_u, pix_v).0)
             }
+            Texture::Noise { noise } => {
+                noise.sample(interaction.position) * Color::new_rgb(1.0, 1.0, 1.0)
+            },
         }
     }
 }

@@ -12,7 +12,7 @@ use crate::{
     Material,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct HitInteraction<'a> {
     pub position: Point3,
     pub normal: Dir3,
@@ -58,7 +58,7 @@ pub trait Hittable: Send + Sync {
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb>;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Sphere<'a> {
     pub center: Point3,
     pub radius: f32,
