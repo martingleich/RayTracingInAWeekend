@@ -39,7 +39,7 @@ fn main() -> Result<(), ImageError> {
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_perlin_spheres(
+    let world = worlds::create_world_final_scene2(
         &mut arena,
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
     );
