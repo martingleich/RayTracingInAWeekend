@@ -19,7 +19,7 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": ["output/image.png", "800", "3900", "50"],
             "cwd": "${workspaceFolder}"
         },
         {
@@ -38,8 +38,8 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": ["output/image.png", "800", "3900", "50"],
             "cwd": "${workspaceFolder}"
-        }
+        },
     ]
 }

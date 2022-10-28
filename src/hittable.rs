@@ -365,9 +365,10 @@ impl<'a, T: Hittable> Hittable for ConstantMedium<'a, T> {
             .boundary
             .hit(ray, &(f32::NEG_INFINITY..f32::INFINITY), rng)?
             .t;
+        let next = start_boundary + 0.001;
         let end_boundary = self
             .boundary
-            .hit(ray, &(start_boundary + 0.0001..f32::INFINITY), rng)?
+            .hit(ray, &(next..f32::INFINITY), rng)?
             .t;
 
         let mut start_medium = start_boundary.max(t_range.start);

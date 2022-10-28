@@ -31,10 +31,13 @@ use vec2::Vec2f;
 use worlds::World;
 
 fn main() -> Result<(), ImageError> {
-    let path = Path::new("output/image.png");
-    let image_width = 800;
-    let samples_per_pixel = 100;
-    let max_depth = 50;
+    let args : Vec<String> = std::env::args().collect();
+
+    let path = Path::new(&args[1]);
+    let image_width = args[2].parse::<i32>().unwrap(); // 800
+    let samples_per_pixel = args[3].parse::<usize>().unwrap(); // 100
+    let max_depth = args[4].parse::<i32>().unwrap(); // 50
+
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
@@ -79,7 +82,7 @@ fn ray_color<THit: Hittable>(
     let mut emitted: Color = Color::BLACK;
     let mut cur_ray = *ray;
     loop {
-        if let Some(interaction) = world.hit(&cur_ray, &(0.0001..f32::INFINITY), rng) {
+        if let Some(interaction) = world.hit(&cur_ray, &(0.001..f32::INFINITY), rng) {
             if depth <= 1 {
                 return Color::BLACK;
             } else if let Some((new_attentuation, scattered)) =

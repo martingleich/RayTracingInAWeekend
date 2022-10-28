@@ -64,7 +64,7 @@ impl<'a> Material<'a> {
                 } else {
                     Dir3::refract(ray.direction, interaction.normal, refraction_ratio)
                 };
-                let scattered = Ray::new(interaction.position, direction, ray.time);
+                let scattered = Ray::new(interaction.position, direction.unit(), ray.time);
                 Some((Color::WHITE, scattered))
             }
             Material::Isotropic { albedo } => {
