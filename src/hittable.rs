@@ -281,12 +281,10 @@ impl<'a> Hittable for AxisAlignedBox<'a> {
             return None;
         };
         let position = ray.origin + t * ray.direction;
-        let dir = (position.0.e[plane]
-            - 0.5 * (self.aabb.max.0.e[plane] - self.aabb.min.0.e[plane]))
-            .signum();
+        let center = (self.aabb.max.0.e[plane] + self.aabb.min.0.e[plane]) * 0.5;
 
         let mut surface_normal = Dir3::ZERO;
-        surface_normal.0.e[plane] = dir;
+        surface_normal.0.e[plane] = (position.0.e[plane] - center).signum();
         return Some(HitInteraction::new_from_ray(
             ray,
             &position,
@@ -321,10 +319,10 @@ impl<'a, THit: Hittable, TTrans: Transformation> Hittable
         self.transformation.reverse_point_mut(&mut moved_ray.origin);
         self.transformation
             .reverse_dir_mut(&mut moved_ray.direction);
-        self.hittable.hit(&moved_ray, t_range, rng).map(|mut f| {
-            self.transformation.apply_point_mut(&mut f.position);
-            self.transformation.apply_dir_mut(&mut f.normal);
-            f
+        self.hittable.hit(&moved_ray, t_range, rng).map(|f| {
+            let new_pos = self.transformation.apply_point(f.position);
+            let new_normal = self.transformation.apply_dir(f.normal);
+            HitInteraction::new_from_ray(ray, &new_pos, &new_normal, f.t, f.material, f.uv)
         })
     }
 

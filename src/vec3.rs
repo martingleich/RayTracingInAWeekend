@@ -91,11 +91,10 @@ impl<T: std::ops::AddAssign<T> + std::default::Default + Copy> std::iter::Sum fo
     }
 }
 
-#[derive(Default, Debug, PartialEq, Clone, Copy)]
+#[derive(Default, PartialEq, Clone, Copy)]
 pub struct Point3(pub Vec3<f32>);
 
 #[derive(
-    Debug,
     PartialEq,
     Clone,
     Copy,
@@ -132,6 +131,18 @@ impl Point3 {
     }
     pub fn components(self) -> [f32; 3] {
         self.0.e
+    }
+}
+
+impl std::fmt::Debug for Point3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}, {}]", self.0.e[0], self.0.e[1], self.0.e[2])
+    }
+}
+
+impl std::fmt::Display for Point3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}, {}]", self.0.e[0], self.0.e[1], self.0.e[2])
     }
 }
 
@@ -235,6 +246,18 @@ impl Dir3 {
             theta / std::f32::consts::PI,
             self.length(),
         )
+    }
+}
+
+impl std::fmt::Debug for Dir3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Dir234").field("0", &self.0).finish()
+    }
+}
+
+impl std::fmt::Display for Dir3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}, {}]", self.0.e[0], self.0.e[1], self.0.e[2])
     }
 }
 
