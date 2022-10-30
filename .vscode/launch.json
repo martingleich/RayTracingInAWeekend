@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug run 'ray_tracing_in_a_weekend'",
+            "name": "Debug run 'ray_tracing_in_a_weekend_app'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=ray_tracing_in_a_weekend",
+                    "--bin=ray_tracing_in_a_weekend_app",
                     "--package=ray_tracing_in_a_weekend",
                 ],
                 "filter": {
-                    "name": "ray_tracing_in_a_weekend",
+                    "name": "ray_tracing_in_a_weekend_app",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Release run 'ray_tracing_in_a_weekend'",
+            "name": "Release run 'ray_tracing_in_a_weekend_app'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=ray_tracing_in_a_weekend",
+                    "--bin=ray_tracing_in_a_weekend_app",
                     "--package=ray_tracing_in_a_weekend",
                     "--release"
                 ],
                 "filter": {
-                    "name": "ray_tracing_in_a_weekend",
+                    "name": "ray_tracing_in_a_weekend_app",
                     "kind": "bin"
                 }
             },

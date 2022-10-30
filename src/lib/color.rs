@@ -17,7 +17,7 @@ use crate::vec3::Vec3;
     derive_more::DivAssign,
     derive_more::Sum,
 )]
-pub struct Color(Vec3<f32>);
+pub struct Color(pub Vec3<f32>);
 
 impl Color {
     pub fn new_rgb(r: f32, g: f32, b: f32) -> Self {

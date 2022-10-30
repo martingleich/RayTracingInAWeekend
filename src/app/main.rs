@@ -31,6 +31,7 @@ fn main() -> Result<(), ImageError> {
         samples_per_pixel,
         max_depth,
         &world,
+        RenderMode::Normals
     );
 
     eprintln!("Saving image...");
