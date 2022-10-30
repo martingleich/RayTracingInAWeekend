@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 
 use self::create_utils::*;
 use ray_tracing_in_a_weekend::*;
@@ -40,10 +40,8 @@ mod create_utils {
 
 pub fn create_world_final_scene2<'a>(
     arena: &'a mut bumpalo::Bump,
-    seed: <common::TRng as SeedableRng>::Seed,
+    rng: &mut common::TRng,
 ) -> World<impl Hittable + 'a> {
-    let mut rng = common::TRng::from_seed(seed);
-
     let camera = Camera::build()
         .vertical_fov(40.0, 1.0)
         .position(Point3::new(478.0, 278.0, -600.0))
@@ -86,7 +84,7 @@ pub fn create_world_final_scene2<'a>(
     let material_metal = solid_metal(arena, Color::new_rgb(0.8, 0.8, 0.9), 1.0);
     let texture_marble = arena.alloc(Texture::Marble {
         scale: 0.1,
-        noise: Perlin::new(8, &mut rng),
+        noise: Perlin::new(8, rng),
     });
     let material_marble = arena.alloc(Material::Lambert {
         albedo: texture_marble,
@@ -168,10 +166,8 @@ pub fn create_world_final_scene2<'a>(
 
 pub fn create_world_perlin_spheres<'a>(
     arena: &'a mut bumpalo::Bump,
-    seed: <common::TRng as SeedableRng>::Seed,
+    rng: &mut common::TRng,
 ) -> World<impl Hittable + 'a> {
-    let mut rng = common::TRng::from_seed(seed);
-
     let camera = Camera::build()
         .vertical_fov(40.0, 3.0 / 4.0)
         .position(Point3::new(13.0, 2.0, 3.0))
@@ -179,7 +175,7 @@ pub fn create_world_perlin_spheres<'a>(
         .build();
 
     let texture_noise = arena.alloc(Texture::Marble {
-        noise: Perlin::new(8, &mut rng),
+        noise: Perlin::new(8, rng),
         scale: 4.0,
     });
     let material_noise = arena.alloc(Material::Lambert {
@@ -198,7 +194,7 @@ pub fn create_world_perlin_spheres<'a>(
 
 pub fn create_world_cornell_box_smoke<'a>(
     arena: &'a mut bumpalo::Bump,
-    _seed: <common::TRng as SeedableRng>::Seed,
+    _rng: &'a mut common::TRng,
 ) -> World<impl Hittable + '_> {
     let hsize = 278.0;
     let camera = Camera::build()
@@ -314,7 +310,7 @@ pub fn create_world_cornell_box_smoke<'a>(
 
 pub fn create_world_cornell_box<'a>(
     arena: &'a mut bumpalo::Bump,
-    _seed: <common::TRng as SeedableRng>::Seed,
+    _rng: &'a mut common::TRng,
 ) -> World<impl Hittable + '_> {
     let hsize = 278.0;
     let camera = Camera::build()
@@ -423,10 +419,10 @@ pub fn create_world_cornell_box<'a>(
     }
 }
 
-pub fn create_world_simple_plane(
-    arena: &mut bumpalo::Bump,
-    _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<impl Hittable + '_> {
+pub fn create_world_simple_plane<'a>(
+    arena: &'a mut bumpalo::Bump,
+    _rng: &'a mut common::TRng,
+) -> World<impl Hittable + 'a> {
     // A single rectangle with a solid
     let camera = Camera::build()
         .vertical_fov(60.0, 9.0 / 16.0)
@@ -457,10 +453,10 @@ pub fn create_world_simple_plane(
     }
 }
 
-pub fn create_world_earth_mapped(
-    arena: &mut bumpalo::Bump,
-    _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<impl Hittable + '_> {
+pub fn create_world_earth_mapped<'a>(
+    arena: &'a mut bumpalo::Bump,
+    _rng: &'a mut common::TRng,
+) -> World<impl Hittable + 'a> {
     // A single sphere with a image texture
     let camera = Camera::build()
         .vertical_fov(60.0, 16.0 / 19.0)
@@ -489,8 +485,8 @@ pub fn create_world_earth_mapped(
 
 pub fn create_world_moving_spheres<'a>(
     arena: &'a mut bumpalo::Bump,
-    _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<impl Hittable + '_> {
+    _rng: &'a mut common::TRng,
+) -> World<impl Hittable + 'a> {
     // One large sphere as ground,
     // One sphere moving fast from left to right
     // One sphere moving fast fro up to down
@@ -552,10 +548,10 @@ pub fn create_world_moving_spheres<'a>(
     }
 }
 
-pub fn create_world_random_scene(
-    arena: &mut bumpalo::Bump,
-    seed: <common::TRng as SeedableRng>::Seed,
-) -> World<impl Hittable + '_> {
+pub fn create_world_random_scene<'a>(
+    arena: &'a mut bumpalo::Bump,
+    rng: &'a mut common::TRng,
+) -> World<impl Hittable + 'a> {
     let camera = Camera::build()
         .vertical_fov(60.0, 9.0 / 16.0)
         .position(Point3::new(13.0, 2.0, 3.0))
@@ -563,8 +559,6 @@ pub fn create_world_random_scene(
         .focus_distance(10.0)
         .aperture(0.1)
         .build();
-
-    let mut rng = common::TRng::from_seed(seed);
 
     let hittable = {
         let mut world = Vec::<Sphere>::new();
@@ -591,11 +585,11 @@ pub fn create_world_random_scene(
                 if (center - Point3::new(4.0, 0.2, 0.0)).length() > 0.9 {
                     let material_sample = rng.gen::<f32>();
                     let material = if material_sample < 0.8 {
-                        let albedo = Color::convolution(rand_color(&mut rng), rand_color(&mut rng));
+                        let albedo = Color::convolution(rand_color(rng), rand_color(rng));
                         let tex = arena.alloc(Texture::Solid { color: albedo });
                         arena.alloc(Material::Lambert { albedo: tex })
                     } else if material_sample < 0.95 {
-                        let albedo = rand_color(&mut rng);
+                        let albedo = rand_color(rng);
                         let fuzz = rng.gen_range(0.0..0.5);
                         let tex = arena.alloc(Texture::Solid { color: albedo });
                         arena.alloc(Material::Metal { albedo: tex, fuzz })
@@ -635,70 +629,60 @@ pub fn create_world_random_scene(
     }
 }
 
-pub fn create_world_defocus_blur(
-    arena: &mut bumpalo::Bump,
-    _seed: <common::TRng as SeedableRng>::Seed,
-) -> World<impl Hittable + '_> {
+pub fn create_world_defocus_blur<'a>(
+    arena: &'a mut bumpalo::Bump,
+    _rng: &'a mut common::TRng,
+) -> World<impl Hittable + 'a> {
     let camera = Camera::build()
         .vertical_fov(60.0, 9.0 / 16.0)
         .position(Point3::ORIGIN + Dir3::BACKWARD * 3.0 + Dir3::UP * 3.0 + 3.0 * Dir3::RIGHT)
         .look_at_focus(Dir3::UP, Point3::ORIGIN + Dir3::FORWARD)
         .aperture(0.1)
         .build();
-    let hittable = {
-        let mut world = Vec::<Sphere>::new();
-        let tex = arena.alloc(Texture::Solid {
-            color: Color::new_rgb(0.8, 0.8, 0.0),
-        });
-        let material_ground = arena.alloc(Material::Lambert { albedo: tex });
-        let tex = arena.alloc(Texture::Solid {
-            color: Color::new_rgb(0.7, 0.3, 0.3),
-        });
-        let material_center = arena.alloc(Material::Lambert { albedo: tex });
-        let tex = arena.alloc(Texture::Solid {
-            color: Color::new_rgb(0.6, 0.6, 0.8),
-        });
-        let material_left = arena.alloc(Material::Metal {
-            albedo: tex,
-            fuzz: 0.05,
-        });
-        let tex = arena.alloc(Texture::Solid {
-            color: Color::new_rgb(0.8, 0.6, 0.2),
-        });
-        let material_right = arena.alloc(Material::Metal {
-            albedo: tex,
-            fuzz: 0.5,
-        });
-        let material_front = arena.alloc(Material::Dielectric {
-            index_of_refraction: 1.5,
-        });
-        world.push(Sphere::new(
-            Point3::ORIGIN + Dir3::DOWN * 100.5,
-            100.0,
-            material_ground,
-        ));
-        world.push(Sphere::new(
-            Point3::ORIGIN + Dir3::FORWARD,
-            0.5,
-            material_center,
-        ));
-        world.push(Sphere::new(
+    let tex = arena.alloc(Texture::Solid {
+        color: Color::new_rgb(0.8, 0.8, 0.0),
+    });
+    let material_ground = arena.alloc(Material::Lambert { albedo: tex });
+    let tex = arena.alloc(Texture::Solid {
+        color: Color::new_rgb(0.7, 0.3, 0.3),
+    });
+    let material_center = arena.alloc(Material::Lambert { albedo: tex });
+    let tex = arena.alloc(Texture::Solid {
+        color: Color::new_rgb(0.6, 0.6, 0.8),
+    });
+    let material_left = arena.alloc(Material::Metal {
+        albedo: tex,
+        fuzz: 0.05,
+    });
+    let tex = arena.alloc(Texture::Solid {
+        color: Color::new_rgb(0.8, 0.6, 0.2),
+    });
+    let material_right = arena.alloc(Material::Metal {
+        albedo: tex,
+        fuzz: 0.5,
+    });
+    let material_front = arena.alloc(Material::Dielectric {
+        index_of_refraction: 1.5,
+    });
+    let hittable = vec![
+        Sphere::new(Point3::ORIGIN + Dir3::DOWN * 100.5, 100.0, material_ground),
+        Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5, material_center),
+        Sphere::new(
             Point3::ORIGIN + Dir3::LEFT + Dir3::FORWARD,
             0.5,
             material_left,
-        ));
-        world.push(Sphere::new(
+        ),
+        Sphere::new(
             Point3::ORIGIN + Dir3::RIGHT + Dir3::FORWARD,
             0.5,
             material_right,
-        ));
-        world.push(Sphere::new(
+        ),
+        Sphere::new(
             Point3::ORIGIN + 0.5 * Dir3::LEFT + 0.3 * Dir3::UP,
             0.3,
             material_front,
-        ));
-        world
-    };
+        ),
+    ];
 
     World {
         camera,

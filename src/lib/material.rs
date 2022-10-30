@@ -49,6 +49,11 @@ impl<'a> Material<'a> {
             Material::Dielectric {
                 index_of_refraction,
             } => {
+                fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
+                    let r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
+                    let rs = r0 * r0;
+                    rs + (1.0 - rs) * (1.0 - cosine).powi(5)
+                }
                 let refraction_ratio = if interaction.front_face {
                     1.0 / index_of_refraction
                 } else {
@@ -85,10 +90,4 @@ impl<'a> Material<'a> {
             _ => Color::BLACK,
         }
     }
-}
-
-fn reflectance(cosine: f32, ref_idx: f32) -> f32 {
-    let r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
-    let rs = r0 * r0;
-    rs + (1.0 - rs) * (1.0 - cosine).powi(5)
 }
