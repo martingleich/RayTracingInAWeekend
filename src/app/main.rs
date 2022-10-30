@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-mod rendering;
 mod worlds;
 
 use image::ImageError;

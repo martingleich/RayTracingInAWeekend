@@ -1,19 +1,22 @@
-use rand::Rng;
-use rand::{distributions::Uniform, SeedableRng};
+use rand::{distributions::Uniform, Rng, SeedableRng};
 use std::{sync::mpsc, thread};
 
-use ray_tracing_in_a_weekend::background_color::BackgroundColor;
-use ray_tracing_in_a_weekend::color::Color;
-use ray_tracing_in_a_weekend::hittable::Hittable;
+use crate::{
+    background_color::BackgroundColor, color::Color, common::TRng, hittable::Hittable, Camera, Ray,
+    Size2i, Vec2f,
+};
 
-use crate::worlds::World;
-use ray_tracing_in_a_weekend::*;
+pub struct World<T: Hittable> {
+    pub camera: Camera,
+    pub hittable: T,
+    pub background: BackgroundColor,
+}
 
 fn ray_color<THit: Hittable>(
     ray: &Ray,
     world: &THit,
     background_color: &BackgroundColor,
-    rng: &mut common::TRng,
+    rng: &mut TRng,
     max_depth: i32,
 ) -> Color {
     let mut depth = max_depth;
@@ -92,7 +95,7 @@ pub fn render<T: Hittable>(
             .into_iter()
             .map(|(thread_id, real_samples_per_pixel)| {
                 let render_pixel = {
-                    let mut sub_rng = common::TRng::from_rng(&mut rng).unwrap();
+                    let mut sub_rng = TRng::from_rng(&mut rng).unwrap();
                     move |fpix: Vec2f| {
                         (0..real_samples_per_pixel)
                             .map(|_| {

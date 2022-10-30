@@ -3,12 +3,6 @@ use rand::Rng;
 use self::create_utils::*;
 use ray_tracing_in_a_weekend::*;
 
-pub struct World<T: Hittable> {
-    pub camera: Camera,
-    pub hittable: T,
-    pub background: BackgroundColor,
-}
-
 mod create_utils {
     use crate::{color::Color, material::Material, texture::Texture};
 
