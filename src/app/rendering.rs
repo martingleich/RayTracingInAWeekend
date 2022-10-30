@@ -1,74 +1,13 @@
-#![allow(dead_code)]
-mod aabb;
-mod background_color;
-mod camera;
-mod color;
-mod common;
-mod hittable;
-mod material;
-mod math;
-mod perlin;
-mod ray;
-mod size2i;
-mod texture;
-mod transformations;
-mod vec2;
-mod vec3;
-mod worlds;
+use rand::Rng;
+use rand::{distributions::Uniform, SeedableRng};
+use std::{sync::mpsc, thread};
 
-use std::{path::Path, sync::mpsc, thread};
+use ray_tracing_in_a_weekend::background_color::BackgroundColor;
+use ray_tracing_in_a_weekend::color::Color;
+use ray_tracing_in_a_weekend::hittable::Hittable;
 
-use background_color::BackgroundColor;
-use color::Color;
-use hittable::Hittable;
-
-use image::ImageError;
-use material::Material;
-use rand::{distributions::Uniform, Rng, SeedableRng};
-use ray::Ray;
-use size2i::Size2i;
-use vec2::Vec2f;
-use worlds::World;
-
-fn main() -> Result<(), ImageError> {
-    let args: Vec<String> = std::env::args().collect();
-
-    let path = Path::new(&args[1]);
-    let image_width = args[2].parse::<i32>().unwrap(); // 800
-    let samples_per_pixel = args[3].parse::<usize>().unwrap(); // 100
-    let max_depth = args[4].parse::<i32>().unwrap(); // 50
-
-    let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
-    eprintln!("Using {thread_count} threads.");
-
-    let mut arena = bumpalo::Bump::new();
-    let world = worlds::create_world_cornell_box(
-        &mut arena,
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
-    );
-    let image_size = Size2i::new(
-        image_width,
-        (image_width as f32 * world.camera.aspect_ratio()) as i32,
-    );
-
-    let pixels = render(
-        image_size,
-        thread_count,
-        samples_per_pixel,
-        max_depth,
-        &world,
-    );
-
-    eprintln!("Saving image...");
-    let bytes = pixels.iter().flat_map(|c| c.to_rgb8()).collect::<Vec<_>>();
-    image::save_buffer(
-        path,
-        &bytes,
-        image_size.width as u32,
-        image_size.height as u32,
-        image::ColorType::Rgb8,
-    )
-}
+use crate::worlds::World;
+use ray_tracing_in_a_weekend::*;
 
 fn ray_color<THit: Hittable>(
     ray: &Ray,
@@ -105,7 +44,7 @@ fn ray_color<THit: Hittable>(
     }
 }
 
-fn render<T: Hittable>(
+pub fn render<T: Hittable>(
     image_size: Size2i,
     thread_count: usize,
     samples_per_pixel: usize,

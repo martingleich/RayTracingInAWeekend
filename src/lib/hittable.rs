@@ -5,11 +5,11 @@ use rand::Rng;
 use crate::{
     aabb::Aabb,
     common,
+    material::Material,
     ray::Ray,
     transformations::Transformation,
     vec2::Vec2f,
     vec3::{Dir3, Point3},
-    Material,
 };
 
 #[derive(Debug, Clone)]

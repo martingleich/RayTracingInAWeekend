@@ -1,23 +1,7 @@
 use rand::{Rng, SeedableRng};
 
-use crate::aabb::Aabb;
-use crate::camera::Camera;
-use crate::color::Color;
-use crate::common;
-use crate::hittable::{
-    AxisAlignedBox, BoundingVolumeHierarchy, ConstantMedium, Hittable, MovingHittable, Rect,
-    Sphere, TransformedHittable,
-};
-
-use crate::background_color::BackgroundColor;
-use crate::material::Material;
-use crate::perlin::Perlin;
-use crate::texture::Texture;
-use crate::transformations::{RotationAroundUp, Transformation, Translation};
-use crate::vec3::{Dir3, Point3};
-
-use self::create_utils::{glass, smoke, solid_diffuse_light, solid_metal};
-use crate::worlds::create_utils::solid_lambert;
+use self::create_utils::*;
+use ray_tracing_in_a_weekend::*;
 
 pub struct World<T: Hittable> {
     pub camera: Camera,
