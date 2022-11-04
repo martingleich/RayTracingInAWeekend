@@ -10,10 +10,10 @@ use rand_distr::{Distribution, UnitBall, UnitSphere};
 #[derive(Debug, Clone)]
 pub enum Material<'a> {
     Lambert { albedo: &'a Texture<'a> },
-    Metal { albedo: &'a Texture<'a>, fuzz: f32 },
-    Dielectric { index_of_refraction: f32 },
+    //Metal { albedo: &'a Texture<'a>, fuzz: f32 },
+    //Dielectric { index_of_refraction: f32 },
     DiffuseLight { emit: &'a Texture<'a> },
-    Isotropic { albedo: &'a Texture<'a> },
+    //Isotropic { albedo: &'a Texture<'a> },
 }
 
 impl<'a> Material<'a> {
@@ -31,6 +31,7 @@ impl<'a> Material<'a> {
                 let color = albedo.sample(interaction);
                 Some((color, scattered))
             }
+            /*
             Material::Metal { albedo, fuzz } => {
                 let fuzz_dir = if fuzz > 0.0 {
                     fuzz * Dir3::new_from_arr(UnitBall.sample(rng))
@@ -80,6 +81,7 @@ impl<'a> Material<'a> {
                 );
                 Some((albedo.sample(interaction), scattered))
             }
+             */
             _ => None,
         }
     }

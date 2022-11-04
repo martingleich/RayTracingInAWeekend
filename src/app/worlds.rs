@@ -12,27 +12,27 @@ mod create_utils {
         arena.alloc(Material::Lambert { albedo })
     }
 
-    pub fn solid_metal(arena: &bumpalo::Bump, color: Color, fuzz: f32) -> &Material {
-        let albedo = arena.alloc(Texture::Solid { color });
-        arena.alloc(Material::Metal { albedo, fuzz })
-    }
+    // pub fn solid_metal(arena: &bumpalo::Bump, color: Color, fuzz: f32) -> &Material {
+    //     let albedo = arena.alloc(Texture::Solid { color });
+    //     arena.alloc(Material::Metal { albedo, fuzz })
+    // }
 
     pub fn solid_diffuse_light(arena: &bumpalo::Bump, color: Color) -> &Material {
         let emit = arena.alloc(Texture::Solid { color });
         arena.alloc(Material::DiffuseLight { emit })
     }
 
-    pub fn smoke(arena: &bumpalo::Bump, color: Color) -> &Material {
-        let albedo = arena.alloc(Texture::Solid { color });
-        arena.alloc(Material::Isotropic { albedo })
-    }
-    pub fn glass(arena: &bumpalo::Bump, index_of_refraction: f32) -> &Material {
-        arena.alloc(Material::Dielectric {
-            index_of_refraction,
-        })
-    }
+    // pub fn smoke(arena: &bumpalo::Bump, color: Color) -> &Material {
+    //     let albedo = arena.alloc(Texture::Solid { color });
+    //     arena.alloc(Material::Isotropic { albedo })
+    // }
+    // pub fn glass(arena: &bumpalo::Bump, index_of_refraction: f32) -> &Material {
+    //     arena.alloc(Material::Dielectric {
+    //         index_of_refraction,
+    //     })
+    // }
 }
-
+/*
 pub fn create_world_suzanne<'a>(
     arena: &'a mut bumpalo::Bump,
     _rng: &mut common::TRng,
@@ -334,7 +334,7 @@ pub fn create_world_cornell_box_smoke<'a>(
         hittable,
     }
 }
-
+ */
 pub fn create_world_cornell_box<'a>(
     arena: &'a mut bumpalo::Bump,
     _rng: &'a mut common::TRng,
@@ -385,8 +385,8 @@ pub fn create_world_cornell_box<'a>(
             ),
             Rect::new_xz(
                 Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
-                300.0,
-                300.0,
+                130.0,
+                130.0,
                 light,
             ),
         ];
@@ -446,6 +446,7 @@ pub fn create_world_cornell_box<'a>(
     }
 }
 
+/* 
 pub fn create_world_simple_plane<'a>(
     arena: &'a mut bumpalo::Bump,
     _rng: &'a mut common::TRng,
@@ -717,3 +718,4 @@ pub fn create_world_defocus_blur<'a>(
         background: BackgroundColor::Sky,
     }
 }
+*/

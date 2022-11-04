@@ -40,6 +40,13 @@ impl Color {
         [ir, ig, ib]
     }
 
+    pub fn to_rgb8_gamma2(self) -> [u8; 3] {
+        let ir = math::clamp(0.0, 255.0, self.0.e[0].sqrt() * 256.0) as u8;
+        let ig = math::clamp(0.0, 255.0, self.0.e[1].sqrt() * 256.0) as u8;
+        let ib = math::clamp(0.0, 255.0, self.0.e[2].sqrt() * 256.0) as u8;
+        [ir, ig, ib]
+    }
+
     pub const BLACK: Self = Self(Vec3 { e: [0.0, 0.0, 0.0] });
 
     pub const WHITE: Self = Self(Vec3 { e: [1.0, 1.0, 1.0] });
