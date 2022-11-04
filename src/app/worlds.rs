@@ -1,6 +1,7 @@
 use rand::Rng;
 
 use self::create_utils::*;
+use crate::obj_loader;
 use ray_tracing_in_a_weekend::*;
 
 mod create_utils {
@@ -29,6 +30,38 @@ mod create_utils {
         arena.alloc(Material::Dielectric {
             index_of_refraction,
         })
+    }
+}
+
+pub fn create_world_suzanne<'a>(
+    arena: &'a mut bumpalo::Bump,
+    _rng: &mut common::TRng,
+) -> World<impl Hittable + 'a> {
+    let camera = Camera::build()
+        .vertical_fov(40.0, 3.0 / 4.0)
+        .position(Point3::new(0.0, 2.0, 10.0))
+        .look_at(Dir3::UP, Point3::new(0.0, 0.0, 0.0))
+        .build();
+
+    let ground_material = solid_lambert(arena, Color::new_rgb(0.4, 0.4, 0.4));
+    let material = glass(arena, 1.5);
+    let path = std::path::Path::new("input/suzanne.obj");
+    let file = std::fs::OpenOptions::new().read(true).open(path).unwrap();
+    let reader = std::io::BufReader::new(file);
+    let cube = obj_loader::load_obj_mesh(reader, material).unwrap();
+    let hittable: Vec<Box<dyn Hittable>> = vec![
+        Box::new(cube),
+        Box::new(Sphere::new(
+            Point3::new(0.0, -1000.0, 0.0),
+            1000.1,
+            ground_material,
+        )),
+    ];
+
+    World {
+        background: BackgroundColor::Sky,
+        camera,
+        hittable,
     }
 }
 

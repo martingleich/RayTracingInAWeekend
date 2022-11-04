@@ -54,22 +54,25 @@ pub enum RenderMode {
 }
 
 impl RenderMode {
-    fn ray_color<THit: Hittable>(self, ray: &Ray,
+    fn ray_color<THit: Hittable>(
+        self,
+        ray: &Ray,
         world: &THit,
         background_color: &BackgroundColor,
         rng: &mut TRng,
-        max_depth: i32,) -> Color {
-            match self {
-                RenderMode::Default => ray_color(ray, world, background_color, rng, max_depth),
-                RenderMode::Normals => {
-                    if let Some(interaction) = world.hit(ray, &(0.001..f32::INFINITY), rng) {
-                        Color((interaction.normal.0 + crate::Vec3::new(1.0, 1.0, 1.0)) * 0.5)
-                    } else {
-                        background_color.sample(ray)
-                    }
-                },
+        max_depth: i32,
+    ) -> Color {
+        match self {
+            RenderMode::Default => ray_color(ray, world, background_color, rng, max_depth),
+            RenderMode::Normals => {
+                if let Some(interaction) = world.hit(ray, &(0.001..f32::INFINITY), rng) {
+                    Color((interaction.normal.0 + crate::Vec3::new(1.0, 1.0, 1.0)) * 0.5)
+                } else {
+                    background_color.sample(ray)
+                }
             }
         }
+    }
 }
 
 pub fn render<T: Hittable>(
@@ -78,7 +81,7 @@ pub fn render<T: Hittable>(
     samples_per_pixel: usize,
     max_depth: i32,
     world: &World<T>,
-    render_mode : RenderMode,
+    render_mode: RenderMode,
 ) -> Vec<Color> {
     eprintln!("Start rendering...");
     let start_time = std::time::Instant::now();

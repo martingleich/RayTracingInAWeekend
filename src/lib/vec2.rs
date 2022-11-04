@@ -1,3 +1,5 @@
+use std::ops::Mul;
+
 use rand::distributions::uniform::SampleUniform;
 use rand::distributions::uniform::UniformSampler;
 use rand::distributions::Uniform;
@@ -23,6 +25,13 @@ impl Vec2f {
     pub const ZERO: Vec2f = Self { x: 0.0, y: 0.0 };
     pub fn dot(a: Vec2f, b: Vec2f) -> f32 {
         a.x * b.x + a.y * b.y
+    }
+}
+
+impl<T: Mul<T, Output = T> + Copy> Mul<T> for Vec2<T> {
+    type Output = Vec2<T>;
+    fn mul(self, rhs: T) -> Self::Output {
+        Self::new(self.x * rhs, self.y * rhs)
     }
 }
 

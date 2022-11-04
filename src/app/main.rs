@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+mod obj_loader;
 mod worlds;
 
 use image::ImageError;
@@ -19,7 +20,7 @@ fn main() -> Result<(), ImageError> {
 
     let mut arena = bumpalo::Bump::new();
     let mut rng = TRng::from_seed([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    let world = worlds::create_world_cornell_box(&mut arena, &mut rng);
+    let world = worlds::create_world_suzanne(&mut arena, &mut rng);
     let image_size = Size2i::new(
         image_width,
         (image_width as f32 * world.camera.aspect_ratio()) as i32,
@@ -31,7 +32,7 @@ fn main() -> Result<(), ImageError> {
         samples_per_pixel,
         max_depth,
         &world,
-        RenderMode::Normals
+        RenderMode::Default,
     );
 
     eprintln!("Saving image...");
