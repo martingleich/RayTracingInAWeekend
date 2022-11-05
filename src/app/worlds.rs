@@ -437,12 +437,19 @@ pub fn create_world_cornell_box<'a>(
         vec![Box::new(walls), Box::new(boxes)]
     };
 
+    let light_geo = Rect::new_xz(
+        Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
+        130.0,
+        130.0,
+        light,
+    ).geometry;
     World {
         background: BackgroundColor::Solid {
             color: Color::BLACK,
         },
         camera,
         hittable,
+        scattering_distribution_provider: Some(WorldScatteringDistributionProvider::Rect(light_geo)),
     }
 }
 

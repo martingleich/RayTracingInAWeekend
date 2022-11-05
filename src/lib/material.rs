@@ -1,4 +1,6 @@
-use crate::common;
+use std::f32::consts::PI;
+
+use crate::{common, Point3};
 use crate::hittable::HitInteraction;
 use crate::{color::Color, texture::Texture};
 
@@ -6,6 +8,24 @@ use crate::ray::Ray;
 use crate::vec3::Dir3;
 use rand::Rng;
 use rand_distr::{Distribution, UnitBall, UnitSphere};
+
+pub enum MaterialScatteringDistribution {
+    Cosine(Dir3),
+    //Mirror(Dir3),
+}
+
+impl MaterialScatteringDistribution {
+    pub fn generate(&self, rng : &mut common::TRng) -> Dir3 {
+        match *self {
+            MaterialScatteringDistribution::Cosine(normal) => (normal + Dir3::new_from_arr(UnitSphere.sample(rng))).unit_or_else(normal),
+        }
+    }
+    pub fn value(&self, dir : Dir3) -> f32 {
+        match *self {
+            MaterialScatteringDistribution::Cosine(normal) => Dir3::dot(normal, dir).max(0.0) / PI,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Material<'a> {
@@ -22,14 +42,12 @@ impl<'a> Material<'a> {
         ray: &Ray,
         interaction: &HitInteraction,
         rng: &mut common::TRng,
-    ) -> Option<(Color, Ray)> {
+    ) -> Option<(Color, MaterialScatteringDistribution)> {
         match *self {
             Material::Lambert { albedo } => {
-                let direction = (interaction.normal + Dir3::new_from_arr(UnitSphere.sample(rng)))
-                    .unit_or_else(interaction.normal);
-                let scattered = Ray::new(interaction.position, direction, ray.time);
                 let color = albedo.sample(interaction);
-                Some((color, scattered))
+                let pdf = MaterialScatteringDistribution::Cosine(interaction.normal);
+                Some((color, pdf))
             }
             /*
             Material::Metal { albedo, fuzz } => {
@@ -83,6 +101,17 @@ impl<'a> Material<'a> {
             }
              */
             _ => None,
+        }
+    }
+
+    pub fn scattering_pdf(&self, ray_in: &Ray, ray_scattered : &Ray, interaction: &HitInteraction) -> f32 {
+        match *self {
+            Material::Lambert { albedo } => {
+                let cosine = Dir3::dot(interaction.normal, ray_scattered.direction);
+                let clamped_cosine = cosine.max(0.0);
+                clamped_cosine / PI
+            },
+            _ => 0.0,
         }
     }
 

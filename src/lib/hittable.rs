@@ -12,6 +12,38 @@ use crate::{
     vec3::{Dir3, Point3},
 };
 
+pub enum WorldScatteringDistributionProvider {
+    Rect(RectGeometry)
+}
+
+pub struct WorldScatteringDistribution<'a> {
+    provider : &'a WorldScatteringDistributionProvider,
+    origin : Point3,
+}
+
+impl WorldScatteringDistributionProvider {
+    pub fn generate(&self, origin : &Point3) -> Option<WorldScatteringDistribution> {
+        match self {
+            _ => {
+                Some(WorldScatteringDistribution{provider: self, origin: *origin})
+            },
+        }
+    }
+}
+
+impl<'a> WorldScatteringDistribution<'a> {
+    pub fn generate(&self, rng : &mut common::TRng) -> Dir3 {
+        match self.provider {
+            WorldScatteringDistributionProvider::Rect(geo) => geo.generate(self.origin, rng),
+        }
+    }
+    pub fn value(&self, direction : Dir3) -> f32 {
+        match self.provider {
+            WorldScatteringDistributionProvider::Rect(geo) => geo.value(self.origin, direction),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct HitInteraction<'a> {
     pub position: Point3,
@@ -132,39 +164,100 @@ pub enum RectPlane {
     Xz,
     Yz,
 }
-pub struct Rect<'a> {
+
+impl RectPlane {
+    pub fn get_axis(&self) -> (usize, usize, usize) {
+        match self {
+            RectPlane::Xy => (0, 1, 2),
+            RectPlane::Xz => (0, 2, 1),
+            RectPlane::Yz => (1, 2, 0),
+        }
+    }
+}
+
+pub struct RectGeometry {
     rect_plane: RectPlane,
     dist: f32,
     r1: Range<f32>,
     r2: Range<f32>,
-    material: &'a Material<'a>,
+}
+
+impl RectGeometry {
+    pub fn hit(&self, ray : &Ray, t_range : &Range<f32>) -> Option<(Point3, Dir3, f32, Vec2f)> {
+        let (p0, p1, n) = self.rect_plane.get_axis();
+        let t = (self.dist - ray.origin.0.e[n]) / ray.direction.0.e[n];
+        if t_range.contains(&t) {
+            let position = ray.origin + t * ray.direction;
+            if self.r1.contains(&position.0.e[p0]) && self.r2.contains(&position.0.e[p1]) {
+                let uv = Vec2f::new(
+                    (position.0.e[p0] - self.r1.start) / (self.r1.end - self.r1.start),
+                    (position.0.e[p1] - self.r2.start) / (self.r1.end - self.r2.start),
+                );
+                let mut surface_normal = Dir3::ZERO;
+                surface_normal.0.e[n] = -1.0;
+                return Some((position, surface_normal, t, uv));
+
+            }
+        }
+        None
+    }
+    pub fn generate(&self, origin : Point3, rng : &mut common::TRng) -> Dir3 {
+        let (p0, p1, n) = self.rect_plane.get_axis();
+        let mut e = [0.0;3];
+        e[p0] = rng.gen_range(self.r1.clone());
+        e[p1] = rng.gen_range(self.r2.clone());
+        e[n] = self.dist;
+        (Point3(crate::Vec3 { e }) - origin).unit()
+    }
+    pub fn value(&self, origin : Point3, direction : Dir3) -> f32 {
+        if let Some(hi) = self.hit(&Ray{origin, direction, time:0.0}, &(0.001..f32::INFINITY)) {
+            let area = (self.r1.end - self.r1.start) * (self.r2.end - self.r2.start);
+            let distance_squared = hi.2 * hi.2;
+            let cosine = Dir3::dot(hi.1, direction).abs();
+
+            distance_squared / (cosine * area)
+        } else {
+            0.0
+        }
+    }
+}
+
+pub struct Rect<'a> {
+    pub geometry : RectGeometry,
+    pub material: &'a Material<'a>,
 }
 
 impl<'a> Rect<'a> {
     pub fn new_xy(center: Point3, width: f32, height: f32, material: &'a Material<'a>) -> Self {
         Self {
-            rect_plane: RectPlane::Xy,
-            dist: center.0.e[2],
-            r1: (center.0.e[0] - width * 0.5)..(center.0.e[0] + width * 0.5),
-            r2: (center.0.e[1] - height * 0.5)..(center.0.e[1] + height * 0.5),
+            geometry: RectGeometry {
+                rect_plane: RectPlane::Xy,
+                dist: center.0.e[2],
+                r1: (center.0.e[0] - width * 0.5)..(center.0.e[0] + width * 0.5),
+                r2: (center.0.e[1] - height * 0.5)..(center.0.e[1] + height * 0.5),
+            },
             material,
         }
     }
     pub fn new_xz(center: Point3, width: f32, depth: f32, material: &'a Material<'a>) -> Self {
         Self {
+            geometry: RectGeometry {
             rect_plane: RectPlane::Xz,
             dist: center.0.e[1],
             r1: (center.0.e[0] - width * 0.5)..(center.0.e[0] + width * 0.5),
             r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
+            },
             material,
         }
     }
     pub fn new_yz(center: Point3, height: f32, depth: f32, material: &'a Material<'a>) -> Self {
         Self {
+            geometry: RectGeometry {
             rect_plane: RectPlane::Yz,
             dist: center.0.e[0],
             r1: (center.0.e[1] - height * 0.5)..(center.0.e[1] + height * 0.5),
             r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
+            },
             material,
         }
     }
@@ -177,30 +270,15 @@ impl<'a> Hittable for Rect<'a> {
         t_range: &Range<f32>,
         _rng: &mut common::TRng,
     ) -> Option<HitInteraction> {
-        let (p0, p1, n) = match self.rect_plane {
-            RectPlane::Xy => (0, 1, 2),
-            RectPlane::Xz => (0, 2, 1),
-            RectPlane::Yz => (1, 2, 0),
-        };
-        let t = (self.dist - ray.origin.0.e[n]) / ray.direction.0.e[n];
-        if t_range.contains(&t) {
-            let position = ray.origin + t * ray.direction;
-            if self.r1.contains(&position.0.e[p0]) && self.r2.contains(&position.0.e[p1]) {
-                let uv = Vec2f::new(
-                    (position.0.e[p0] - self.r1.start) / (self.r1.end - self.r1.start),
-                    (position.0.e[p1] - self.r2.start) / (self.r1.end - self.r2.start),
-                );
-                let mut surface_normal = Dir3::ZERO;
-                surface_normal.0.e[n] = -1.0;
-                return Some(HitInteraction::new_from_ray(
-                    ray,
-                    &position,
-                    &surface_normal,
-                    t,
-                    self.material,
-                    uv,
-                ));
-            }
+        if let Some((position, surface_normal, t, uv)) = self.geometry.hit(ray, t_range) {
+            return Some(HitInteraction::new_from_ray(
+                ray,
+                &position,
+                &surface_normal,
+                t,
+                self.material,
+                uv,
+            ));
         }
         None
     }

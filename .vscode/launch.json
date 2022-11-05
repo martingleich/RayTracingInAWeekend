@@ -39,7 +39,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["output/image.png", "800", "1000", "50"],
+            "args": ["output/image.png", "1600", "10000", "50"],
             "cwd": "${workspaceFolder}"
         },
     ]

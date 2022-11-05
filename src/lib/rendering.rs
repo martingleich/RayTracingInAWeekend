@@ -2,48 +2,73 @@ use rand::{distributions::Uniform, Rng, SeedableRng};
 use std::{sync::mpsc, thread};
 
 use crate::{
-    background_color::BackgroundColor, color::Color, common::TRng, hittable::Hittable, Camera, Ray,
-    Size2i, Vec2f,
+    background_color::BackgroundColor, color::Color, common::{TRng, self}, hittable::Hittable, Camera, Ray,
+    Size2i, Vec2f, WorldScatteringDistributionProvider, MaterialScatteringDistribution, Dir3, WorldScatteringDistribution,
 };
 
 pub struct World<T: Hittable> {
     pub camera: Camera,
     pub hittable: T,
     pub background: BackgroundColor,
+    pub scattering_distribution_provider : Option<WorldScatteringDistributionProvider>,
 }
 
 fn ray_color<THit: Hittable>(
     ray: &Ray,
-    world: &THit,
-    background_color: &BackgroundColor,
+    world: &World<THit>,
     rng: &mut TRng,
     max_depth: i32,
 ) -> Color {
     let mut depth = max_depth;
-    let mut attentuation: Color = Color::WHITE;
-    let mut emitted: Color = Color::BLACK;
+    let mut accum_attentuation: Color = Color::WHITE;
+    let mut accum_emitted: Color = Color::BLACK;
     let mut cur_ray = *ray;
     loop {
-        if let Some(interaction) = world.hit(&cur_ray, &(0.001..f32::INFINITY), rng) {
+        if let Some(interaction) = world.hittable.hit(&cur_ray, &(0.001..f32::INFINITY), rng) {
             if depth <= 1 {
                 return Color::BLACK;
-            } else if let Some((new_attentuation, scattered)) =
+            } else if let Some((attentuation, material_scattering_distribution)) =
                 interaction.material.scatter(&cur_ray, &interaction, rng)
             {
-                let emitted_new = interaction.material.emit(&interaction);
-                attentuation = Color::convolution(attentuation, new_attentuation);
-                emitted += Color::convolution(attentuation, emitted_new);
+                let world_scattering_distribution = world.scattering_distribution_provider.as_ref().map(|p| p.generate(&interaction.position)).flatten();
+                let (scattered_pdf, scattered_dir) = sample_final_scattering_distribution(&world_scattering_distribution, &material_scattering_distribution, rng);
+                let scattered = Ray::new(interaction.position, scattered_dir, cur_ray.time);
+                let scattering_pdf = interaction.material.scattering_pdf(&cur_ray, &scattered, &interaction);
+                let emitted = interaction.material.emit(&interaction);
+                let probablity = scattering_pdf / scattered_pdf;
+                accum_emitted += Color::convolution(accum_attentuation, emitted);
+                accum_attentuation = Color::convolution(accum_attentuation, attentuation) * probablity;
                 cur_ray = scattered;
                 depth -= 1;
                 continue;
             } else {
-                let emitted_new = interaction.material.emit(&interaction);
-                return Color::convolution(attentuation, emitted_new);
+                let emitted = interaction.material.emit(&interaction);
+                return accum_emitted + Color::convolution(accum_attentuation, emitted);
             }
         } else {
-            let background_color = background_color.sample(ray);
-            return emitted + Color::convolution(attentuation, background_color);
+            let emitted = world.background.sample(ray);
+            return accum_emitted + Color::convolution(accum_attentuation, emitted);
         }
+    }
+}
+
+fn sample_final_scattering_distribution(
+    world : &Option<WorldScatteringDistribution>,
+    material : &MaterialScatteringDistribution,
+    rng : &mut common::TRng) -> (f32, Dir3) {
+    if let Some(world) = world {
+        let mix : f32 = 0.5;
+        let dir = if rng.gen_bool(mix as f64) {
+            world.generate(rng)
+        } else {
+            material.generate(rng)
+        };
+        let p = mix * world.value(dir) + (1.0 - mix) * material.value(dir);
+        (p, dir)
+    } else {
+        let dir = material.generate(rng);
+        let p = material.value(dir);
+        (p, dir)
     }
 }
 
@@ -57,18 +82,17 @@ impl RenderMode {
     fn ray_color<THit: Hittable>(
         self,
         ray: &Ray,
-        world: &THit,
-        background_color: &BackgroundColor,
+        world: &World<THit>,
         rng: &mut TRng,
         max_depth: i32,
     ) -> Color {
         match self {
-            RenderMode::Default => ray_color(ray, world, background_color, rng, max_depth),
+            RenderMode::Default => ray_color(ray, world, rng, max_depth),
             RenderMode::Normals => {
-                if let Some(interaction) = world.hit(ray, &(0.001..f32::INFINITY), rng) {
+                if let Some(interaction) = world.hittable.hit(ray, &(0.001..f32::INFINITY), rng) {
                     Color((interaction.normal.0 + crate::Vec3::new(1.0, 1.0, 1.0)) * 0.5)
                 } else {
-                    background_color.sample(ray)
+                    world.background.sample(ray)
                 }
             }
         }
@@ -132,8 +156,7 @@ pub fn render<T: Hittable>(
                                 let ray = world.camera.ray(&mut sub_rng, pix);
                                 render_mode.ray_color(
                                     &ray,
-                                    &world.hittable,
-                                    &world.background,
+                                    world,
                                     &mut sub_rng,
                                     max_depth,
                                 )
