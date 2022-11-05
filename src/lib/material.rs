@@ -11,18 +11,26 @@ use rand_distr::{Distribution, UnitBall, UnitSphere};
 
 pub enum MaterialScatteringDistribution {
     Cosine(Dir3),
-    //Mirror(Dir3),
+    Mirror(Dir3),
 }
 
 impl MaterialScatteringDistribution {
     pub fn generate(&self, rng : &mut common::TRng) -> Dir3 {
         match *self {
             MaterialScatteringDistribution::Cosine(normal) => (normal + Dir3::new_from_arr(UnitSphere.sample(rng))).unit_or_else(normal),
+            MaterialScatteringDistribution::Mirror(direction) => direction,
         }
     }
     pub fn value(&self, dir : Dir3) -> f32 {
         match *self {
             MaterialScatteringDistribution::Cosine(normal) => Dir3::dot(normal, dir).max(0.0) / PI,
+            MaterialScatteringDistribution::Mirror(_) => f32::INFINITY,
+        }
+    }
+    pub fn is_discrete(&self) -> bool {
+        match *self {
+            MaterialScatteringDistribution::Cosine(_) => false,
+            MaterialScatteringDistribution::Mirror(_) => true,
         }
     }
 }
@@ -30,7 +38,7 @@ impl MaterialScatteringDistribution {
 #[derive(Debug, Clone)]
 pub enum Material<'a> {
     Lambert { albedo: &'a Texture<'a> },
-    //Metal { albedo: &'a Texture<'a>, fuzz: f32 },
+    Metal { albedo: &'a Texture<'a>, fuzz: f32 },
     //Dielectric { index_of_refraction: f32 },
     DiffuseLight { emit: &'a Texture<'a> },
     //Isotropic { albedo: &'a Texture<'a> },
@@ -49,7 +57,7 @@ impl<'a> Material<'a> {
                 let pdf = MaterialScatteringDistribution::Cosine(interaction.normal);
                 Some((color, pdf))
             }
-            /*
+
             Material::Metal { albedo, fuzz } => {
                 let fuzz_dir = if fuzz > 0.0 {
                     fuzz * Dir3::new_from_arr(UnitBall.sample(rng))
@@ -58,13 +66,14 @@ impl<'a> Material<'a> {
                 };
                 let direction = Dir3::reflect(ray.direction, interaction.normal) + fuzz_dir;
                 if Dir3::dot(direction, interaction.normal) > 0.0 {
-                    let scattered = Ray::new(interaction.position, direction.unit(), ray.time);
+                    let scattered = MaterialScatteringDistribution::Mirror(direction.unit());
                     let color = albedo.sample(interaction);
                     Some((color, scattered))
                 } else {
                     None
                 }
             }
+            /*
             Material::Dielectric {
                 index_of_refraction,
             } => {

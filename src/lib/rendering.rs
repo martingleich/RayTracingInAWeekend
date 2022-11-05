@@ -30,12 +30,23 @@ fn ray_color<THit: Hittable>(
             } else if let Some((attentuation, material_scattering_distribution)) =
                 interaction.material.scatter(&cur_ray, &interaction, rng)
             {
-                let world_scattering_distribution = world.scattering_distribution_provider.as_ref().map(|p| p.generate(&interaction.position)).flatten();
-                let (scattered_pdf, scattered_dir) = sample_final_scattering_distribution(&world_scattering_distribution, &material_scattering_distribution, rng);
-                let scattered = Ray::new(interaction.position, scattered_dir, cur_ray.time);
-                let scattering_pdf = interaction.material.scattering_pdf(&cur_ray, &scattered, &interaction);
+                let (scattered, probablity) = 
+                if material_scattering_distribution.is_discrete() {
+                    let scattered_dir = material_scattering_distribution.generate(rng);
+                    let scattered = Ray::new(interaction.position, scattered_dir, cur_ray.time);
+                    (scattered, 1.0)
+                } else {
+                    let world_scattering_distribution = world.scattering_distribution_provider.as_ref().map(|p| p.generate(&interaction.position)).flatten();
+                    let (scattered_pdf, scattered_dir) = sample_final_scattering_distribution(&world_scattering_distribution, &material_scattering_distribution, rng);
+                    let scattered = Ray::new(interaction.position, scattered_dir, cur_ray.time);
+                    let scattering_pdf = interaction.material.scattering_pdf(&cur_ray, &scattered, &interaction);
+                    let probablity = scattering_pdf / scattered_pdf;
+                    (scattered, probablity)
+                };
+
+
                 let emitted = interaction.material.emit(&interaction);
-                let probablity = scattering_pdf / scattered_pdf;
+                
                 accum_emitted += Color::convolution(accum_attentuation, emitted);
                 accum_attentuation = Color::convolution(accum_attentuation, attentuation) * probablity;
                 cur_ray = scattered;

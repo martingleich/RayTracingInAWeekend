@@ -12,38 +12,6 @@ use crate::{
     vec3::{Dir3, Point3},
 };
 
-pub enum WorldScatteringDistributionProvider {
-    Rect(RectGeometry)
-}
-
-pub struct WorldScatteringDistribution<'a> {
-    provider : &'a WorldScatteringDistributionProvider,
-    origin : Point3,
-}
-
-impl WorldScatteringDistributionProvider {
-    pub fn generate(&self, origin : &Point3) -> Option<WorldScatteringDistribution> {
-        match self {
-            _ => {
-                Some(WorldScatteringDistribution{provider: self, origin: *origin})
-            },
-        }
-    }
-}
-
-impl<'a> WorldScatteringDistribution<'a> {
-    pub fn generate(&self, rng : &mut common::TRng) -> Dir3 {
-        match self.provider {
-            WorldScatteringDistributionProvider::Rect(geo) => geo.generate(self.origin, rng),
-        }
-    }
-    pub fn value(&self, direction : Dir3) -> f32 {
-        match self.provider {
-            WorldScatteringDistributionProvider::Rect(geo) => geo.value(self.origin, direction),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct HitInteraction<'a> {
     pub position: Point3,
