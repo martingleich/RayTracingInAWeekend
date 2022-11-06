@@ -1,8 +1,8 @@
 use std::f32::consts::PI;
 
-use crate::{common, Point3};
 use crate::hittable::HitInteraction;
 use crate::{color::Color, texture::Texture};
+use crate::{common, Point3};
 
 use crate::ray::Ray;
 use crate::vec3::Dir3;
@@ -15,15 +15,19 @@ pub enum MaterialScatteringDistribution {
 }
 
 impl MaterialScatteringDistribution {
-    pub fn generate(&self, rng : &mut common::TRng) -> Dir3 {
+    pub fn generate(&self, rng: &mut common::TRng) -> Dir3 {
         match *self {
-            MaterialScatteringDistribution::Cosine(normal) => (normal + Dir3::new_from_arr(UnitSphere.sample(rng))).unit_or_else(normal),
+            MaterialScatteringDistribution::Cosine(normal) => {
+                (normal + Dir3::new_from_arr(UnitSphere.sample(rng))).unit_or_else(normal)
+            }
             MaterialScatteringDistribution::Mirror(direction) => direction,
         }
     }
-    pub fn value(&self, dir : Dir3) -> f32 {
+    pub fn value(&self, direction: Dir3) -> f32 {
         match *self {
-            MaterialScatteringDistribution::Cosine(normal) => Dir3::dot(normal, dir).max(0.0) / PI,
+            MaterialScatteringDistribution::Cosine(normal) => {
+                Dir3::dot(normal, direction).max(0.0) / PI
+            }
             MaterialScatteringDistribution::Mirror(_) => f32::INFINITY,
         }
     }
@@ -113,13 +117,18 @@ impl<'a> Material<'a> {
         }
     }
 
-    pub fn scattering_pdf(&self, ray_in: &Ray, ray_scattered : &Ray, interaction: &HitInteraction) -> f32 {
+    pub fn scattering_pdf(
+        &self,
+        ray_in: &Ray,
+        ray_scattered: &Ray,
+        interaction: &HitInteraction,
+    ) -> f32 {
         match *self {
             Material::Lambert { albedo } => {
                 let cosine = Dir3::dot(interaction.normal, ray_scattered.direction);
                 let clamped_cosine = cosine.max(0.0);
                 clamped_cosine / PI
-            },
+            }
             _ => 0.0,
         }
     }

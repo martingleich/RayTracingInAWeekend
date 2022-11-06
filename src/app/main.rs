@@ -36,7 +36,10 @@ fn main() -> Result<(), ImageError> {
     );
 
     eprintln!("Saving image...");
-    let bytes = pixels.iter().flat_map(|c| c.to_rgb8_gamma2()).collect::<Vec<_>>();
+    let bytes = pixels
+        .iter()
+        .flat_map(|c| c.to_rgb8_gamma2())
+        .collect::<Vec<_>>();
     image::save_buffer(
         path,
         &bytes,

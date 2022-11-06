@@ -338,7 +338,7 @@ pub fn create_world_cornell_box_smoke<'a>(
 pub fn create_world_cornell_box<'a>(
     arena: &'a mut bumpalo::Bump,
     _rng: &'a mut common::TRng,
-) -> World<impl Hittable + '_> {
+) -> World<'a> {
     let hsize = 278.0;
     let camera = Camera::build()
         .vertical_fov(40.0, 1.0)
@@ -351,91 +351,86 @@ pub fn create_world_cornell_box<'a>(
     let green = solid_lambert(arena, Color::new_rgb(0.12, 0.45, 0.15));
     let light = solid_diffuse_light(arena, Color::new_rgb(15.0, 15.0, 15.0));
 
-    let hittable: Vec<Box<dyn Hittable>> = {
-        let walls = vec![
-            Rect::new_yz(
-                Point3::new(0.0, hsize, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                red,
-            ),
-            Rect::new_yz(
-                Point3::new(2.0 * hsize, hsize, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                green,
-            ),
-            Rect::new_xz(
-                Point3::new(hsize, 0.0, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                white,
-            ),
-            Rect::new_xz(
-                Point3::new(hsize, 2.0 * hsize, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                white,
-            ),
-            Rect::new_xy(
-                Point3::new(hsize, hsize, 2.0 * hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                white,
-            ),
-            Rect::new_xz(
-                Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
-                130.0,
-                130.0,
-                light,
-            ),
-        ];
-
-        let boxes = {
-            let mut boxes = Vec::new();
-            let box1_base = arena.alloc(AxisAlignedBox::new(
-                &Aabb {
-                    min: Point3::new(0.0, 0.0, 0.0),
-                    max: Point3::new(165.0, 330.0, 165.0),
-                },
-                white,
-            ));
-            let box1_rot = arena.alloc(TransformedHittable {
-                hittable: box1_base,
-                transformation: RotationAroundUp::new(15.0),
-            });
-            let box1 = TransformedHittable {
-                hittable: box1_rot,
-                transformation: Translation {
-                    offset: Dir3::new(265.0, 0.0, 295.0),
-                },
-            };
-            boxes.push(box1);
-
-            let box2_base = arena.alloc(AxisAlignedBox::new(
-                &Aabb {
-                    min: Point3::new(0.0, 0.0, 0.0),
-                    max: Point3::new(165.0, 165.0, 165.0),
-                },
-                white,
-            ));
-            let box2_rot = arena.alloc(TransformedHittable {
-                hittable: box2_base,
-                transformation: RotationAroundUp::new(-18.0),
-            });
-            let box2 = TransformedHittable {
-                hittable: box2_rot,
-                transformation: Translation {
-                    offset: Dir3::new(130.0, 0.0, 65.0),
-                },
-            };
-            boxes.push(box2);
-
-            boxes
+    let walls : &dyn Hittable = arena.alloc(vec![
+        Rect::new_yz(
+            Point3::new(0.0, hsize, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            red,
+        ),
+        Rect::new_yz(
+            Point3::new(2.0 * hsize, hsize, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            green,
+        ),
+        Rect::new_xz(
+            Point3::new(hsize, 0.0, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            white,
+        ),
+        Rect::new_xz(
+            Point3::new(hsize, 2.0 * hsize, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            white,
+        ),
+        Rect::new_xy(
+            Point3::new(hsize, hsize, 2.0 * hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            white,
+        ),
+        Rect::new_xz(
+            Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
+            130.0,
+            130.0,
+            light,
+        ),
+    ]);
+    let boxes : &dyn Hittable = {
+        let box1_base = arena.alloc(AxisAlignedBox::new(
+            &Aabb {
+                min: Point3::new(0.0, 0.0, 0.0),
+                max: Point3::new(165.0, 330.0, 165.0),
+            },
+            white,
+        ));
+        let box1_rot = arena.alloc(TransformedHittable {
+            hittable: box1_base,
+            transformation: RotationAroundUp::new(15.0),
+        });
+        let box1 = TransformedHittable {
+            hittable: box1_rot,
+            transformation: Translation {
+                offset: Dir3::new(265.0, 0.0, 295.0),
+            },
         };
 
-        vec![Box::new(walls), Box::new(boxes)]
+        let box2_base = arena.alloc(AxisAlignedBox::new(
+            &Aabb {
+                min: Point3::new(0.0, 0.0, 0.0),
+                max: Point3::new(165.0, 165.0, 165.0),
+            },
+            white,
+        ));
+        let box2_rot = arena.alloc(TransformedHittable {
+            hittable: box2_base,
+            transformation: RotationAroundUp::new(-18.0),
+        });
+        let box2 = TransformedHittable {
+            hittable: box2_rot,
+            transformation: Translation {
+                offset: Dir3::new(130.0, 0.0, 65.0),
+            },
+        };
+        arena.alloc(vec![box1, box2])
     };
+
+    let vec = vec![walls, boxes];
+    let alloced = arena.alloc(vec);
+    let hittable : &dyn Hittable = alloced;
 
     let light_geo = Rect::new_xz(
         Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
@@ -443,17 +438,20 @@ pub fn create_world_cornell_box<'a>(
         130.0,
         light,
     ).geometry;
+
     World {
         background: BackgroundColor::Solid {
             color: Color::BLACK,
         },
         camera,
         hittable,
-        scattering_distribution_provider: Some(WorldScatteringDistributionProvider::Rect(light_geo)),
+        scattering_distribution_provider: Some(WorldScatteringDistributionProvider::Rect(
+            light_geo,
+        )),
     }
 }
 
-/* 
+/*
 pub fn create_world_simple_plane<'a>(
     arena: &'a mut bumpalo::Bump,
     _rng: &'a mut common::TRng,

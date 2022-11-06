@@ -15,6 +15,7 @@ pub mod texture;
 pub mod transformations;
 pub mod vec2;
 pub mod vec3;
+pub mod world_scattering_distribution;
 
 pub use self::aabb::*;
 pub use self::background_color::*;
@@ -33,3 +34,4 @@ pub use self::texture::*;
 pub use self::transformations::*;
 pub use self::vec2::*;
 pub use self::vec3::*;
+pub use self::world_scattering_distribution::*;

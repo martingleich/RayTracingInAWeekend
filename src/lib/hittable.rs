@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use rand::Rng;
+use rand_distr::UnitSphere;
 
 use crate::{
     aabb::Aabb,
@@ -10,6 +11,13 @@ use crate::{
     transformations::Transformation,
     vec2::Vec2f,
     vec3::{Dir3, Point3},
+};
+
+pub mod rect_geometry;
+pub mod sphere_geometry;
+use self::{
+    rect_geometry::{RectGeometry, RectPlane},
+    sphere_geometry::SphereGeometry,
 };
 
 #[derive(Debug, Clone)]
@@ -60,24 +68,17 @@ pub trait Hittable: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct Sphere<'a> {
-    pub center: Point3,
-    pub radius: f32,
+    pub geometry: SphereGeometry,
     pub material: &'a Material<'a>,
 }
 
 impl<'a> Sphere<'a> {
     pub fn new(center: Point3, radius: f32, material: &'a Material) -> Self {
         Self {
-            center,
-            radius,
+            geometry: SphereGeometry::new(center, radius),
             material,
         }
     }
-}
-
-fn get_sphere_uv(pos: Dir3) -> Vec2f {
-    let (theta, phi, _) = pos.to_radian();
-    Vec2f::new(theta, phi)
 }
 
 impl<'a> Hittable for Sphere<'a> {
@@ -87,111 +88,20 @@ impl<'a> Hittable for Sphere<'a> {
         t_range: &Range<f32>,
         _rng: &mut common::TRng,
     ) -> Option<HitInteraction> {
-        let oc = ray.origin - self.center;
-        let half_b = Dir3::dot(oc, ray.direction);
-        let c = oc.length_squared() - self.radius * self.radius;
-        let disc = half_b * half_b - c;
-        if disc < 0.0 {
-            None
-        } else {
-            let sqrtd = disc.sqrt();
-            let root_small = -half_b - sqrtd;
-            let root: f32;
-            if t_range.contains(&root_small) {
-                root = root_small;
-            } else {
-                let root_large = -half_b + sqrtd;
-                if t_range.contains(&root_large) {
-                    root = root_large;
-                } else {
-                    return None;
-                }
-            }
-            let position = ray.at(root);
-            let surface_normal = (position - self.center) / self.radius;
-            let uv = get_sphere_uv(surface_normal);
-
-            Some(HitInteraction::new_from_ray(
-                ray,
-                &position,
-                &surface_normal,
-                root,
-                self.material,
-                uv,
-            ))
-        }
+        self.geometry
+            .hit(ray, t_range)
+            .map(|(position, surface_normal, t, uv)| {
+                HitInteraction::new_from_ray(ray, &position, &surface_normal, t, self.material, uv)
+            })
     }
 
     fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
-        Some(Aabb::new_radius(self.center, self.radius))
-    }
-}
-
-pub enum RectPlane {
-    Xy,
-    Xz,
-    Yz,
-}
-
-impl RectPlane {
-    pub fn get_axis(&self) -> (usize, usize, usize) {
-        match self {
-            RectPlane::Xy => (0, 1, 2),
-            RectPlane::Xz => (0, 2, 1),
-            RectPlane::Yz => (1, 2, 0),
-        }
-    }
-}
-
-pub struct RectGeometry {
-    rect_plane: RectPlane,
-    dist: f32,
-    r1: Range<f32>,
-    r2: Range<f32>,
-}
-
-impl RectGeometry {
-    pub fn hit(&self, ray : &Ray, t_range : &Range<f32>) -> Option<(Point3, Dir3, f32, Vec2f)> {
-        let (p0, p1, n) = self.rect_plane.get_axis();
-        let t = (self.dist - ray.origin.0.e[n]) / ray.direction.0.e[n];
-        if t_range.contains(&t) {
-            let position = ray.origin + t * ray.direction;
-            if self.r1.contains(&position.0.e[p0]) && self.r2.contains(&position.0.e[p1]) {
-                let uv = Vec2f::new(
-                    (position.0.e[p0] - self.r1.start) / (self.r1.end - self.r1.start),
-                    (position.0.e[p1] - self.r2.start) / (self.r1.end - self.r2.start),
-                );
-                let mut surface_normal = Dir3::ZERO;
-                surface_normal.0.e[n] = -1.0;
-                return Some((position, surface_normal, t, uv));
-
-            }
-        }
-        None
-    }
-    pub fn generate(&self, origin : Point3, rng : &mut common::TRng) -> Dir3 {
-        let (p0, p1, n) = self.rect_plane.get_axis();
-        let mut e = [0.0;3];
-        e[p0] = rng.gen_range(self.r1.clone());
-        e[p1] = rng.gen_range(self.r2.clone());
-        e[n] = self.dist;
-        (Point3(crate::Vec3 { e }) - origin).unit()
-    }
-    pub fn value(&self, origin : Point3, direction : Dir3) -> f32 {
-        if let Some(hi) = self.hit(&Ray{origin, direction, time:0.0}, &(0.001..f32::INFINITY)) {
-            let area = (self.r1.end - self.r1.start) * (self.r2.end - self.r2.start);
-            let distance_squared = hi.2 * hi.2;
-            let cosine = Dir3::dot(hi.1, direction).abs();
-
-            distance_squared / (cosine * area)
-        } else {
-            0.0
-        }
+        Some(self.geometry.bounding_box())
     }
 }
 
 pub struct Rect<'a> {
-    pub geometry : RectGeometry,
+    pub geometry: RectGeometry,
     pub material: &'a Material<'a>,
 }
 
@@ -210,10 +120,10 @@ impl<'a> Rect<'a> {
     pub fn new_xz(center: Point3, width: f32, depth: f32, material: &'a Material<'a>) -> Self {
         Self {
             geometry: RectGeometry {
-            rect_plane: RectPlane::Xz,
-            dist: center.0.e[1],
-            r1: (center.0.e[0] - width * 0.5)..(center.0.e[0] + width * 0.5),
-            r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
+                rect_plane: RectPlane::Xz,
+                dist: center.0.e[1],
+                r1: (center.0.e[0] - width * 0.5)..(center.0.e[0] + width * 0.5),
+                r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
             },
             material,
         }
@@ -221,10 +131,10 @@ impl<'a> Rect<'a> {
     pub fn new_yz(center: Point3, height: f32, depth: f32, material: &'a Material<'a>) -> Self {
         Self {
             geometry: RectGeometry {
-            rect_plane: RectPlane::Yz,
-            dist: center.0.e[0],
-            r1: (center.0.e[1] - height * 0.5)..(center.0.e[1] + height * 0.5),
-            r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
+                rect_plane: RectPlane::Yz,
+                dist: center.0.e[0],
+                r1: (center.0.e[1] - height * 0.5)..(center.0.e[1] + height * 0.5),
+                r2: (center.0.e[2] - depth * 0.5)..(center.0.e[2] + depth * 0.5),
             },
             material,
         }
@@ -238,17 +148,11 @@ impl<'a> Hittable for Rect<'a> {
         t_range: &Range<f32>,
         _rng: &mut common::TRng,
     ) -> Option<HitInteraction> {
-        if let Some((position, surface_normal, t, uv)) = self.geometry.hit(ray, t_range) {
-            return Some(HitInteraction::new_from_ray(
-                ray,
-                &position,
-                &surface_normal,
-                t,
-                self.material,
-                uv,
-            ));
-        }
-        None
+        self.geometry
+            .hit(ray, t_range)
+            .map(|(position, surface_normal, t, uv)| {
+                HitInteraction::new_from_ray(ray, &position, &surface_normal, t, self.material, uv)
+            })
     }
 
     fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
@@ -346,12 +250,12 @@ impl<'a> Hittable for AxisAlignedBox<'a> {
     }
 }
 
-pub struct TransformedHittable<'a, THit: Hittable, TTrans: Transformation> {
+pub struct TransformedHittable<'a, THit: Hittable, TTrans : Transformation> {
     pub hittable: &'a THit,
     pub transformation: TTrans,
 }
 
-impl<'a, THit: Hittable, TTrans: Transformation> Hittable
+impl<'a, THit: Hittable, TTrans:Transformation> Hittable
     for TransformedHittable<'a, THit, TTrans>
 {
     fn hit(
@@ -444,24 +348,47 @@ impl<'a, T: Hittable> Hittable for ConstantMedium<'a, T> {
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
         self.boundary.bounding_box(time_range)
     }
-}
+}  
 
-impl Hittable for Box<dyn Hittable + '_> {
+impl<T: Hittable> Hittable for Vec<T> {
     fn hit(
         &self,
         ray: &Ray,
         t_range: &Range<f32>,
         rng: &mut common::TRng,
     ) -> Option<HitInteraction> {
-        self.as_ref().hit(ray, t_range, rng)
+        let mut range = t_range.clone();
+        let mut min_interaction: Option<HitInteraction> = None;
+        for hittable in self {
+            if let Some(hi) = hittable.hit(ray, &range, rng) {
+                range.end = hi.t;
+                min_interaction = Some(hi);
+            }
+        }
+        min_interaction
     }
 
     fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
-        self.as_ref().bounding_box(time_range)
+        // If any child is None -> None
+        // Empty list -> None
+        // else reduce(AABB::new_surounding)
+        let mut result: Option<Aabb> = None;
+        for hittable in self {
+            if let Some(aabb) = &hittable.bounding_box(time_range) {
+                if let Some(old) = &result {
+                    result = Some(Aabb::new_surrounding_boxes(&[*old, *aabb]))
+                } else {
+                    result = Some(*aabb);
+                }
+            } else {
+                return None;
+            }
+        }
+        result
     }
 }
 
-impl<T: Hittable> Hittable for Vec<T> {
+impl Hittable for Vec<&dyn Hittable> {
     fn hit(
         &self,
         ray: &Ray,

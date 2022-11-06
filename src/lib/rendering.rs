@@ -2,20 +2,24 @@ use rand::{distributions::Uniform, Rng, SeedableRng};
 use std::{sync::mpsc, thread};
 
 use crate::{
-    background_color::BackgroundColor, color::Color, common::{TRng, self}, hittable::Hittable, Camera, Ray,
-    Size2i, Vec2f, WorldScatteringDistributionProvider, MaterialScatteringDistribution, Dir3, WorldScatteringDistribution,
+    background_color::BackgroundColor,
+    color::Color,
+    common::{self, TRng},
+    hittable::Hittable,
+    Camera, Dir3, MaterialScatteringDistribution, Ray, Size2i, Vec2f, WorldScatteringDistribution,
+    WorldScatteringDistributionProvider,
 };
 
-pub struct World<T: Hittable> {
+pub struct World<'a> {
     pub camera: Camera,
-    pub hittable: T,
+    pub hittable: &'a dyn Hittable,
     pub background: BackgroundColor,
-    pub scattering_distribution_provider : Option<WorldScatteringDistributionProvider>,
+    pub scattering_distribution_provider: Option<WorldScatteringDistributionProvider>,
 }
 
-fn ray_color<THit: Hittable>(
+fn ray_color<'a>(
     ray: &Ray,
-    world: &World<THit>,
+    world: &World<'a>,
     rng: &mut TRng,
     max_depth: i32,
 ) -> Color {
@@ -30,25 +34,35 @@ fn ray_color<THit: Hittable>(
             } else if let Some((attentuation, material_scattering_distribution)) =
                 interaction.material.scatter(&cur_ray, &interaction, rng)
             {
-                let (scattered, probablity) = 
-                if material_scattering_distribution.is_discrete() {
+                let (scattered, probablity) = if material_scattering_distribution.is_discrete() {
                     let scattered_dir = material_scattering_distribution.generate(rng);
                     let scattered = Ray::new(interaction.position, scattered_dir, cur_ray.time);
                     (scattered, 1.0)
                 } else {
-                    let world_scattering_distribution = world.scattering_distribution_provider.as_ref().map(|p| p.generate(&interaction.position)).flatten();
-                    let (scattered_pdf, scattered_dir) = sample_final_scattering_distribution(&world_scattering_distribution, &material_scattering_distribution, rng);
+                    let world_scattering_distribution = world
+                        .scattering_distribution_provider
+                        .as_ref()
+                        .map(|p| p.generate(&interaction.position))
+                        .flatten();
+                    let (scattered_pdf, scattered_dir) = sample_final_scattering_distribution(
+                        &world_scattering_distribution,
+                        &material_scattering_distribution,
+                        rng,
+                    );
                     let scattered = Ray::new(interaction.position, scattered_dir, cur_ray.time);
-                    let scattering_pdf = interaction.material.scattering_pdf(&cur_ray, &scattered, &interaction);
+                    let scattering_pdf =
+                        interaction
+                            .material
+                            .scattering_pdf(&cur_ray, &scattered, &interaction);
                     let probablity = scattering_pdf / scattered_pdf;
                     (scattered, probablity)
                 };
 
-
                 let emitted = interaction.material.emit(&interaction);
-                
+
                 accum_emitted += Color::convolution(accum_attentuation, emitted);
-                accum_attentuation = Color::convolution(accum_attentuation, attentuation) * probablity;
+                accum_attentuation =
+                    Color::convolution(accum_attentuation, attentuation) * probablity;
                 cur_ray = scattered;
                 depth -= 1;
                 continue;
@@ -64,22 +78,23 @@ fn ray_color<THit: Hittable>(
 }
 
 fn sample_final_scattering_distribution(
-    world : &Option<WorldScatteringDistribution>,
-    material : &MaterialScatteringDistribution,
-    rng : &mut common::TRng) -> (f32, Dir3) {
+    world: &Option<WorldScatteringDistribution>,
+    material: &MaterialScatteringDistribution,
+    rng: &mut common::TRng,
+) -> (f32, Dir3) {
     if let Some(world) = world {
-        let mix : f32 = 0.5;
-        let dir = if rng.gen_bool(mix as f64) {
+        let mix: f32 = 0.5;
+        let direction = if rng.gen_bool(mix as f64) {
             world.generate(rng)
         } else {
             material.generate(rng)
         };
-        let p = mix * world.value(dir) + (1.0 - mix) * material.value(dir);
-        (p, dir)
+        let p = mix * world.value(direction) + (1.0 - mix) * material.value(direction);
+        (p, direction)
     } else {
-        let dir = material.generate(rng);
-        let p = material.value(dir);
-        (p, dir)
+        let direction = material.generate(rng);
+        let p = material.value(direction);
+        (p, direction)
     }
 }
 
@@ -90,10 +105,10 @@ pub enum RenderMode {
 }
 
 impl RenderMode {
-    fn ray_color<THit: Hittable>(
+    fn ray_color<'a>(
         self,
         ray: &Ray,
-        world: &World<THit>,
+        world: &'a World<'a>,
         rng: &mut TRng,
         max_depth: i32,
     ) -> Color {
@@ -110,12 +125,12 @@ impl RenderMode {
     }
 }
 
-pub fn render<T: Hittable>(
+pub fn render<'a>(
     image_size: Size2i,
     thread_count: usize,
     samples_per_pixel: usize,
     max_depth: i32,
-    world: &World<T>,
+    world: &World,
     render_mode: RenderMode,
 ) -> Vec<Color> {
     eprintln!("Start rendering...");
@@ -165,12 +180,7 @@ pub fn render<T: Hittable>(
                             .map(|_| {
                                 let pix = fpix + sub_rng.sample(pixel_sample_distr_ref);
                                 let ray = world.camera.ray(&mut sub_rng, pix);
-                                render_mode.ray_color(
-                                    &ray,
-                                    world,
-                                    &mut sub_rng,
-                                    max_depth,
-                                )
+                                render_mode.ray_color(&ray, world, &mut sub_rng, max_depth)
                             })
                             .sum::<Color>()
                             / real_samples_per_pixel as f32
