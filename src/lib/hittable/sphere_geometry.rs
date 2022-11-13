@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::{Aabb, Dir3, Point3, Ray, Vec2f, GeoHitInteraction};
+use crate::{Aabb, Dir3, GeoHitInteraction, Point3, Ray, Vec2f};
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct SphereGeometry {
@@ -43,7 +43,13 @@ impl SphereGeometry {
             let surface_normal = (position - self.center) / self.radius;
             let uv = Self::get_sphere_uv(surface_normal);
 
-            Some(GeoHitInteraction::new_from_ray(ray, &position, &surface_normal, t, uv))
+            Some(GeoHitInteraction::new_from_ray(
+                ray,
+                &position,
+                &surface_normal,
+                t,
+                uv,
+            ))
         }
     }
 

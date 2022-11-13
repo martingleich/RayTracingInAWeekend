@@ -2,9 +2,9 @@ use std::ops::Range;
 
 use rand::Rng;
 
-use crate::{common, Dir3, Point3, Ray, Vec2f, GeoHitInteraction, Aabb};
+use crate::{common, Aabb, Dir3, GeoHitInteraction, Point3, Ray, Vec2f};
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum RectPlane {
     Xy,
     Xz,
@@ -35,14 +35,24 @@ impl RectGeometry {
         let t = (self.dist - ray.origin.0.e[n]) / ray.direction.0.e[n];
         if t_range.contains(&t) {
             let position = ray.origin + t * ray.direction;
-            if position.0.e[p0] >= self.r0.0 && self.r0.0 <= position.0.e[p0] && position.0.e[p1] >= self.r1.0 && self.r1.0 <= position.0.e[p1] {
+            if position.0.e[p0] >= self.r0.0
+                && position.0.e[p0] <= self.r0.1
+                && position.0.e[p1] >= self.r1.0
+                && position.0.e[p1] <= self.r1.1
+            {
                 let uv = Vec2f::new(
                     (position.0.e[p0] - self.r0.0) / (self.r0.1 - self.r0.0),
                     (position.0.e[p1] - self.r1.0) / (self.r0.1 - self.r1.0),
                 );
                 let mut surface_normal = Dir3::ZERO;
                 surface_normal.0.e[n] = -1.0;
-                return Some(GeoHitInteraction::new_from_ray(ray, &position, &surface_normal, t, uv));
+                return Some(GeoHitInteraction::new_from_ray(
+                    ray,
+                    &position,
+                    &surface_normal,
+                    t,
+                    uv,
+                ));
             }
         }
         None
@@ -74,7 +84,7 @@ impl RectGeometry {
         }
     }
 
-    pub fn bounding_box(&self, thickness : f32) -> Aabb {
+    pub fn bounding_box(&self, thickness: f32) -> Aabb {
         let (p0, p1, n) = self.rect_plane.get_axis();
         let mut min = Point3::ORIGIN;
         let mut max = Point3::ORIGIN;

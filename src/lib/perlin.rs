@@ -72,17 +72,17 @@ impl Perlin {
         }
 
         let mut accum = 0.0;
-        for i in 0..2 {
+        for (i, ci) in c.iter().enumerate() {
             let fi = i as f32;
-            for j in 0..2 {
+            for (j, cij) in ci.iter().enumerate() {
                 let fj = j as f32;
-                for k in 0..2 {
+                for (k, cijk) in cij.iter().enumerate() {
                     let fk = k as f32;
                     let weight = Dir3::new(u - i as f32, v - j as f32, w - k as f32);
                     accum += (fi * uu + (1.0 - fi) * (1.0 - uu))
                         * (fj * vv + (1.0 - fj) * (1.0 - vv))
                         * (fk * ww + (1.0 - fk) * (1.0 - ww))
-                        * Dir3::dot(c[i][j][k], weight);
+                        * Dir3::dot(*cijk, weight);
                 }
             }
         }

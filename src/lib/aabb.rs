@@ -3,7 +3,8 @@ use std::ops::Range;
 use crate::{
     math,
     ray::Ray,
-    vec3::{Dir3, Point3}, GeoHitInteraction, Vec2f,
+    vec3::{Dir3, Point3},
+    GeoHitInteraction, Vec2f,
 };
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 pub struct Aabb {
@@ -61,11 +62,7 @@ impl Aabb {
         true
     }
 
-    pub fn hit(
-        &self,
-        ray: &Ray,
-        t_range: &Range<f32>
-    ) -> Option<GeoHitInteraction> {
+    pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<GeoHitInteraction> {
         let ((near_t, near_plane), (far_t, far_plane)) =
             self.intersections_line(ray.origin, ray.direction)?;
         let (t, plane) = if t_range.contains(&near_t) {
@@ -80,13 +77,13 @@ impl Aabb {
 
         let mut surface_normal = Dir3::ZERO;
         surface_normal.0.e[plane] = (position.0.e[plane] - center).signum();
-        return Some(GeoHitInteraction::new_from_ray(
+        Some(GeoHitInteraction::new_from_ray(
             ray,
             &position,
             &surface_normal,
             t,
             Vec2f::ZERO,
-        ));
+        ))
     }
     pub fn intersections_line(
         &self,

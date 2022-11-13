@@ -1,13 +1,8 @@
 use ray_tracing_in_a_weekend::*;
 
-use crate::obj_loader;
-
 use super::world_builder::WorldBuilder;
 
-pub fn create_world_suzanne<'a>(
-    wb : &'a WorldBuilder<'a>,
-    _rng: &'a mut common::TRng,
-) -> World<'a> {
+pub fn create_world_suzanne<'a>(wb: &'a WorldBuilder<'a>, _rng: &'a mut common::TRng) -> World<'a> {
     let camera = Camera::build()
         .vertical_fov(40.0, 3.0 / 4.0)
         .position(Point3::new(0.0, 2.0, 10.0))
@@ -16,23 +11,24 @@ pub fn create_world_suzanne<'a>(
 
     let mat_ground = wb.material_lambert_solid(Color::new_rgb(0.4, 0.4, 0.4));
     let mat_monkey = wb.material_lambert_solid(Color::new_rgb(1.0, 0.2, 0.2));
-    let path = std::path::Path::new("input/suzanne.obj");
-    let file = std::fs::OpenOptions::new().read(true).open(path).unwrap();
-    let reader = std::io::BufReader::new(file);
-    let monkey = obj_loader::load_obj_mesh(reader).unwrap();
-    let mut group = wb.new_group();
-    for tri in monkey {
-        let geo_tri = Geometry::Triangle(tri);
-        group.add(wb.new_obj(geo_tri).set_material(mat_monkey))
-    }
-    group.add(wb.new_obj_sphere(1000.1).translate(Dir3::new(0.0, -1000.0, 0.0)).set_material(mat_ground));
+    let group = wb
+        .new_group()
+        .add(wb.new_mesh_from_file_obj_uniform_material(
+            std::path::Path::new("input/suzanne.obj"),
+            mat_monkey,
+        ))
+        .add(
+            wb.new_obj_sphere(1000.1, mat_ground)
+                .translate(Dir3::new(0.0, -1000.0, 0.0)),
+        )
+        .build();
 
-    let hittable = wb.group_to_hittable(group, &camera.time_interval);
+    let (hittable, scattering_distribution_provider) = group.finish(wb, &camera.time_interval);
     World {
         background: BackgroundColor::Sky,
         camera,
         hittable,
-        scattering_distribution_provider: None,
+        scattering_distribution_provider,
     }
 }
 
@@ -308,7 +304,7 @@ pub fn create_world_cornell_box_smoke<'a>(
 }
  */
 pub fn create_world_cornell_box<'a>(
-    wb : &'a WorldBuilder<'a>,
+    wb: &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
 ) -> World<'a> {
     let hsize = 278.0;
@@ -323,41 +319,72 @@ pub fn create_world_cornell_box<'a>(
     let green = wb.material_lambert_solid(Color::new_rgb(0.12, 0.45, 0.15));
     let light = wb.material_diffuse_light_solid(Color::new_rgb(15.0, 15.0, 15.0));
 
-    let mut group = wb.new_group();
-    group.add(wb.new_obj_rect_yz(Point3::new(0.0, hsize, hsize), 2.0 * hsize, 2.0 * hsize).set_material(red));
-    group.add(wb.new_obj_rect_yz(Point3::new(2.0 * hsize, hsize, hsize), 2.0 * hsize, 2.0 * hsize).set_material(green));
-    group.add(wb.new_obj_rect_xz(Point3::new(hsize, 0.0, hsize), 2.0 * hsize, 2.0 * hsize).set_material(white));
-    group.add(wb.new_obj_rect_xz(Point3::new(hsize, 2.0 * hsize, hsize), 2.0 * hsize, 2.0 * hsize).set_material(white));
-    group.add(wb.new_obj_rect_xy(Point3::new(hsize, hsize, 2.0 * hsize), 2.0 * hsize, 2.0 * hsize).set_material(white));
-    let light_obj = wb.new_obj_rect_xz(Point3::new(hsize, 2.0 * hsize - 1.0, hsize), 130.0, 130.0).set_material(light);
-    group.add(light_obj);
+    let group = wb
+        .new_group()
+        .add(wb.new_obj_rect_yz(
+            Point3::new(0.0, hsize, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            red,
+        ))
+        .add(wb.new_obj_rect_yz(
+            Point3::new(2.0 * hsize, hsize, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            green,
+        ))
+        .add(wb.new_obj_rect_xz(
+            Point3::new(hsize, 0.0, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            white,
+        ))
+        .add(wb.new_obj_rect_xz(
+            Point3::new(hsize, 2.0 * hsize, hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            white,
+        ))
+        .add(wb.new_obj_rect_xy(
+            Point3::new(hsize, hsize, 2.0 * hsize),
+            2.0 * hsize,
+            2.0 * hsize,
+            white,
+        ))
+        .add(
+            wb.new_obj_rect_xz(
+                Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
+                130.0,
+                130.0,
+                light,
+            )
+            .set_all_geo_as_poi(),
+        )
+        .add(
+            wb.new_obj_box(165.0, 330.0, 165.0, white)
+                .rotate_around_up(15.0)
+                .translate(Dir3::new(265.0, 0.0, 295.0)),
+        )
+        .add(
+            wb.new_obj_box(165.0, 165.0, 165.0, white)
+                .rotate_around_up(-18.0)
+                .translate(Dir3::new(130.0, 0.0, 65.0)),
+        )
+        .build();
 
-    group.add(wb
-        .new_obj_box(165.0, 330.0, 165.0)
-        .rotate_around_up(15.0)
-        .translate(Dir3::new(265.0, 0.0, 295.0))
-        .set_material(white));
-
-    group.add(wb
-        .new_obj_box(165.0, 165.0, 165.0)
-        .rotate_around_up(-18.0)
-        .translate(Dir3::new(130.0, 0.0, 65.0))
-        .set_material(white));
-
-    let hittable = wb.group_to_hittable(group, &camera.time_interval);
+    let (hittable, scattering_distribution_provider) = group.finish(wb, &camera.time_interval);
     World {
         background: BackgroundColor::Solid {
             color: Color::BLACK,
         },
         camera,
         hittable,
-        scattering_distribution_provider: light_obj.get_world_scattering_provider()
+        scattering_distribution_provider,
     }
 }
 
-
 pub fn create_world_simple_plane<'a>(
-    wb : &'a WorldBuilder<'a>,
+    wb: &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
 ) -> World<'a> {
     let camera = Camera::build()
@@ -369,22 +396,25 @@ pub fn create_world_simple_plane<'a>(
     let mat_emit = wb.material_diffuse_light_solid(100.0 * Color::new_rgb(1.0, 1.0, 1.0));
     let mat_floor = wb.material_lambert_solid(Color::new_rgb(0.0, 0.0, 0.4));
 
-    let mut scene = wb.new_group();
-    let obj_light = wb.new_obj_rect_xy(Point3::new(0.0, 2.0, 0.0), 1.0, 1.0).set_material(mat_emit);
-    scene.add(obj_light);
-    scene.add(wb.new_obj_rect_xz(Point3::ORIGIN, 10.0, 10.0).set_material(mat_floor));
+    let scene = wb
+        .new_group()
+        .add(
+            wb.new_obj_rect_xy(Point3::new(0.0, 2.0, 0.0), 1.0, 1.0, mat_emit)
+                .set_all_geo_as_poi(),
+        )
+        .add(wb.new_obj_rect_xz(Point3::ORIGIN, 10.0, 10.0, mat_floor))
+        .build();
 
-    let hittable = wb.group_to_hittable(scene, &camera.time_interval);
+    let (hittable, scattering_distribution_provider) = scene.finish(wb, &camera.time_interval);
     World {
         camera,
         hittable,
         background: BackgroundColor::Solid {
             color: Color::new_rgb(0.1, 0.1, 0.1),
         },
-        scattering_distribution_provider: obj_light.get_world_scattering_provider(),
+        scattering_distribution_provider,
     }
 }
-
 
 pub fn create_world_earth_mapped<'a>(
     wb: &'a WorldBuilder<'a>,
@@ -397,17 +427,22 @@ pub fn create_world_earth_mapped<'a>(
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
 
-    let tex_earth = wb.texture_image_from_file(std::path::Path::new("input/earthmap.jpg"), image::ImageFormat::Jpeg);
+    let tex_earth = wb.texture_image_from_file(
+        std::path::Path::new("input/earthmap.jpg"),
+        image::ImageFormat::Jpeg,
+    );
     let mat_earth = wb.material_lambert(tex_earth);
 
-    let mut scene = wb.new_group();
-    scene.add(wb.new_obj_sphere(2.0).set_material(mat_earth));
-    let hittable = wb.group_to_hittable(scene, &camera.time_interval);
+    let scene = wb
+        .new_group()
+        .add(wb.new_obj_sphere(2.0, mat_earth))
+        .build();
+    let (hittable, scattering_distribution_provider) = scene.finish(wb, &camera.time_interval);
     World {
         camera,
         hittable,
         background: BackgroundColor::Sky,
-        scattering_distribution_provider : None,
+        scattering_distribution_provider,
     }
 }
 
@@ -569,25 +604,42 @@ pub fn create_world_defocus_blur<'a>(
         .look_at_focus(Dir3::UP, Point3::ORIGIN + Dir3::FORWARD)
         .aperture(0.1)
         .build();
-    
+
     let material_ground = wb.material_lambert_solid(Color::new_rgb(0.8, 0.8, 0.0));
     let material_center = wb.material_lambert_solid(Color::new_rgb(0.7, 0.3, 0.3));
     let material_left = wb.material_metal_solid(Color::new_rgb(0.6, 0.6, 0.8), 0.05);
     let material_right = wb.material_metal_solid(Color::new_rgb(0.8, 0.6, 0.2), 0.5);
     let material_front = wb.material_dielectric(1.5);
 
-    let mut group = wb.new_group();
-    group.add(wb.new_obj_sphere(100.0).translate(Dir3::DOWN * 100.5).set_material(material_ground));
-    group.add(wb.new_obj_sphere(0.5).translate(Dir3::FORWARD).set_material(material_center));
-    group.add(wb.new_obj_sphere(0.5).translate(Dir3::LEFT + Dir3::FORWARD).set_material(material_left));
-    group.add(wb.new_obj_sphere(0.5).translate(Dir3::RIGHT + Dir3::FORWARD).set_material(material_right));
-    group.add(wb.new_obj_sphere(0.3).translate(0.5 * Dir3::LEFT + 0.3 * Dir3::UP).set_material(material_front));
+    let group = wb
+        .new_group()
+        .add(
+            wb.new_obj_sphere(100.0, material_ground)
+                .translate(Dir3::DOWN * 100.5),
+        )
+        .add(
+            wb.new_obj_sphere(0.5, material_center)
+                .translate(Dir3::FORWARD),
+        )
+        .add(
+            wb.new_obj_sphere(0.5, material_left)
+                .translate(Dir3::LEFT + Dir3::FORWARD),
+        )
+        .add(
+            wb.new_obj_sphere(0.5, material_right)
+                .translate(Dir3::RIGHT + Dir3::FORWARD),
+        )
+        .add(
+            wb.new_obj_sphere(0.3, material_front)
+                .translate(0.5 * Dir3::LEFT + 0.3 * Dir3::UP),
+        )
+        .build();
 
-    let hittable = wb.group_to_hittable(group, &camera.time_interval);
+    let (hittable, scattering_distribution_provider) = group.finish(wb, &camera.time_interval);
     World {
         camera,
         hittable,
         background: BackgroundColor::Sky,
-        scattering_distribution_provider: None,
+        scattering_distribution_provider,
     }
 }

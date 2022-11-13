@@ -15,12 +15,10 @@ pub struct WorldScatteringDistribution<'a> {
 
 impl WorldScatteringDistributionProvider {
     pub fn generate(&self, origin: &Point3) -> Option<WorldScatteringDistribution> {
-        match self {
-            _ => Some(WorldScatteringDistribution {
-                provider: self,
-                origin: *origin,
-            }),
-        }
+        Some(WorldScatteringDistribution {
+            provider: self,
+            origin: *origin,
+        })
     }
 }
 

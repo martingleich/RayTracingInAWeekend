@@ -1,20 +1,16 @@
 use std::ops::Range;
 
-use crate::{Point3, Dir3, GeoHitInteraction, Ray, Vec2f, math, Aabb};
+use crate::{math, Aabb, Dir3, GeoHitInteraction, Point3, Ray, Vec2f};
 
 #[derive(Debug, Clone, Copy)]
 pub struct TriangleGeometry {
-    pub positions : [Point3; 3],
-    pub normals : [Dir3; 3],
-    pub texture_coords : [Vec2f; 3],
+    pub positions: [Point3; 3],
+    pub normals: [Dir3; 3],
+    pub texture_coords: [Vec2f; 3],
 }
 
 impl TriangleGeometry {
-    pub fn hit(
-        &self,
-        ray: &Ray,
-        t_range: &Range<f32>,
-    ) -> Option<GeoHitInteraction> {
+    pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<GeoHitInteraction> {
         let [p0, p1, p2] = self.positions;
         let dir1 = p1 - p0;
         let dir2 = p2 - p0;

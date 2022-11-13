@@ -28,7 +28,7 @@ fn main() -> Result<(), ImageError> {
         "demo:simple_plane" => worlds::demo_worlds::create_world_simple_plane(&wb, &mut rng),
         "demo:earth_mapped" => worlds::demo_worlds::create_world_earth_mapped(&wb, &mut rng),
         "demo:suzanne" => worlds::demo_worlds::create_world_suzanne(&wb, &mut rng),
-        _ => panic!()
+        _ => panic!(),
     };
     let image_size = Size2i::new(
         image_width,

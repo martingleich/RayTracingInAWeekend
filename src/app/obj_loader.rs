@@ -1,8 +1,10 @@
 use std::str::Chars;
 
-use ray_tracing_in_a_weekend::{Dir3, Point3, Vec2, Vec2f, Vec3, triangle_geometry::TriangleGeometry};
+use ray_tracing_in_a_weekend::{
+    triangle_geometry::TriangleGeometry, Dir3, Point3, Vec2, Vec2f, Vec3,
+};
 
-pub fn load_obj_mesh<'a, R: std::io::BufRead>(reader: R) -> Result<Vec<TriangleGeometry>> {
+pub fn load_obj_mesh<R: std::io::BufRead>(reader: R) -> Result<Vec<TriangleGeometry>> {
     let mut loader = ObjLoader {
         positions: Vec::new(),
         normals: Vec::new(),
@@ -23,7 +25,7 @@ struct ObjLoader {
     positions: Vec<Point3>,
     normals: Vec<Dir3>,
     texture_coords: Vec<Vec2f>,
-    triangles : Vec<TriangleGeometry>,
+    triangles: Vec<TriangleGeometry>,
 }
 
 struct Scanner<'a> {
@@ -73,11 +75,7 @@ impl<'a> Scanner<'a> {
         let result = self.peeked;
         self.str = self.chars.as_str();
         self.peeked = self.chars.next();
-        if let Some(x) = result {
-            Some(x)
-        } else {
-            None
-        }
+        result
     }
     pub fn try_take_char(&mut self, c: char) -> Option<char> {
         self.try_take_char_fn(|x| x == c)
@@ -86,12 +84,12 @@ impl<'a> Scanner<'a> {
         if let Some(x) = self.peeked {
             if c(x) {
                 self.take().unwrap();
-                return Some(x);
+                Some(x)
             } else {
-                return None;
+                None
             }
         } else {
-            return None;
+            None
         }
     }
     pub fn peek(&self) -> Option<char> {
@@ -105,18 +103,18 @@ impl<'a> Scanner<'a> {
         }
     }
     pub fn take_at_least_one_whitespace(&mut self) -> Result<()> {
-        if !self.try_take_char(' ').is_some() {
+        if self.try_take_char(' ').is_none() {
             return Err(ScannerError::ExpectedAtLeastOnWhitespace);
         }
         self.take_any_whitespace()
     }
     pub fn take_any_whitespace(&mut self) -> Result<()> {
         while self.try_take_char(' ').is_some() {}
-        return Ok(());
+        Ok(())
     }
     pub fn take_str_digits(&mut self) -> Result<&str> {
         let start = self.str;
-        if !self.try_take_char_fn(char::is_numeric).is_some() {
+        if self.try_take_char_fn(char::is_numeric).is_none() {
             return Err(ScannerError::ExpectedDigits);
         }
 
@@ -125,10 +123,7 @@ impl<'a> Scanner<'a> {
     }
     pub fn take_usize(&mut self) -> Result<usize> {
         let digits = self.take_str_digits();
-        digits.and_then(|str| {
-            str.parse::<usize>()
-                .map_err(|e| ScannerError::UsizeFormat(e))
-        })
+        digits.and_then(|str| str.parse::<usize>().map_err(ScannerError::UsizeFormat))
     }
     pub fn take_float_digits(&mut self) -> Result<&str> {
         let start = self.str;
@@ -141,7 +136,7 @@ impl<'a> Scanner<'a> {
     }
     pub fn take_f32(&mut self) -> Result<f32> {
         let digits = self.take_float_digits();
-        digits.and_then(|str| str.parse::<f32>().map_err(|e| ScannerError::F32Format(e)))
+        digits.and_then(|str| str.parse::<f32>().map_err(ScannerError::F32Format))
     }
     pub fn take_line_type(&mut self) -> Result<LineType> {
         match self.try_take_char_fn(|c| (c == 'v' || c == 'f' || c == '#' || c == 'o')) {
@@ -217,7 +212,7 @@ impl<'a> Scanner<'a> {
 }
 
 impl ObjLoader {
-    fn parse_line(&mut self, str: &String) -> Result<()> {
+    fn parse_line(&mut self, str: &str) -> Result<()> {
         match Scanner::parse_line(str.chars())? {
             LineType::V(v) => {
                 self.positions.push(Point3(v));
@@ -229,10 +224,10 @@ impl ObjLoader {
                 self.texture_coords.push(v);
             }
             LineType::F(vertex_ids) => {
-                let mut tri = TriangleGeometry{
+                let mut tri = TriangleGeometry {
                     positions: [Point3::ORIGIN, Point3::ORIGIN, Point3::ORIGIN],
                     normals: [Dir3::ZERO, Dir3::ZERO, Dir3::ZERO],
-                    texture_coords: [Vec2f::ZERO, Vec2f::ZERO, Vec2f::ZERO]
+                    texture_coords: [Vec2f::ZERO, Vec2f::ZERO, Vec2f::ZERO],
                 };
                 for (i, ids) in vertex_ids.iter().enumerate() {
                     let position = *self
@@ -257,7 +252,7 @@ impl ObjLoader {
                         tri.positions[i] = position;
                         tri.normals[i] = normal;
                         tri.texture_coords[i] = uv;
-                    } else  {
+                    } else {
                         tri.positions[1] = tri.positions[2];
                         tri.normals[1] = tri.normals[2];
                         tri.texture_coords[1] = tri.texture_coords[2];

@@ -5,8 +5,8 @@ use crate::{
     background_color::BackgroundColor,
     color::Color,
     common::{self, TRng},
-    Camera, Dir3, MaterialScatteringDistribution, Ray, Size2i, Vec2f, WorldScatteringDistribution,
-    WorldScatteringDistributionProvider, Scene,
+    Camera, Dir3, MaterialScatteringDistribution, Ray, Scene, Size2i, Vec2f,
+    WorldScatteringDistribution, WorldScatteringDistributionProvider,
 };
 
 pub struct World<'a> {
@@ -16,12 +16,7 @@ pub struct World<'a> {
     pub scattering_distribution_provider: Option<WorldScatteringDistributionProvider>,
 }
 
-fn ray_color<'a>(
-    ray: &Ray,
-    world: &World<'a>,
-    rng: &mut TRng,
-    max_depth: i32,
-) -> Color {
+fn ray_color<'a>(ray: &Ray, world: &World<'a>, rng: &mut TRng, max_depth: i32) -> Color {
     let mut depth = max_depth;
     let mut accum_attentuation: Color = Color::WHITE;
     let mut accum_emitted: Color = Color::BLACK;
@@ -41,8 +36,7 @@ fn ray_color<'a>(
                     let world_scattering_distribution = world
                         .scattering_distribution_provider
                         .as_ref()
-                        .map(|p| p.generate(&interaction.position))
-                        .flatten();
+                        .and_then(|p| p.generate(&interaction.position));
                     let (scattered_pdf, scattered_dir) = sample_final_scattering_distribution(
                         &world_scattering_distribution,
                         &material_scattering_distribution,
@@ -124,7 +118,7 @@ impl RenderMode {
     }
 }
 
-pub fn render<'a>(
+pub fn render(
     image_size: Size2i,
     thread_count: usize,
     samples_per_pixel: usize,

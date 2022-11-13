@@ -1,8 +1,8 @@
 use std::f32::consts::PI;
 
+use crate::common;
 use crate::hittable::HitInteraction;
 use crate::{color::Color, texture::Texture};
-use crate::common;
 
 use crate::ray::Ray;
 use crate::vec3::Dir3;
@@ -104,7 +104,9 @@ impl<'a> Material<'a> {
                 Some((Color::WHITE, scattered))
             }
             Material::Isotropic { albedo } => {
-                let scattered = MaterialScatteringDistribution::Mirror(Dir3::new_from_arr(UnitSphere.sample(rng)));
+                let scattered = MaterialScatteringDistribution::Mirror(Dir3::new_from_arr(
+                    UnitSphere.sample(rng),
+                ));
                 Some((albedo.sample(interaction), scattered))
             }
             _ => None,
@@ -118,7 +120,7 @@ impl<'a> Material<'a> {
         interaction: &HitInteraction,
     ) -> f32 {
         match *self {
-            Material::Lambert { albedo:_ } => {
+            Material::Lambert { albedo: _ } => {
                 let cosine = Dir3::dot(interaction.normal, ray_scattered.direction);
                 let clamped_cosine = cosine.max(0.0);
                 clamped_cosine / PI

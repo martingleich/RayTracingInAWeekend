@@ -9,15 +9,15 @@ use crate::{
     ray::Ray,
     transformations::Transformation,
     vec2::Vec2f,
-    vec3::{Dir3, Point3}, WorldScatteringDistributionProvider,
+    vec3::{Dir3, Point3},
+    WorldScatteringDistributionProvider,
 };
 
 pub mod rect_geometry;
 pub mod sphere_geometry;
 pub mod triangle_geometry;
 use self::{
-    rect_geometry::RectGeometry,
-    sphere_geometry::SphereGeometry,
+    rect_geometry::RectGeometry, sphere_geometry::SphereGeometry,
     triangle_geometry::TriangleGeometry,
 };
 
@@ -53,8 +53,15 @@ impl GeoHitInteraction {
         }
     }
 
-    pub fn to_hit_interaction<'a>(&self, material : &'a Material<'a>) -> HitInteraction<'a> {
-        HitInteraction { position: self.position, normal: self.normal, uv: self.uv, t: self.t, front_face: self.front_face, material }
+    pub fn to_hit_interaction<'a>(&self, material: &'a Material<'a>) -> HitInteraction<'a> {
+        HitInteraction {
+            position: self.position,
+            normal: self.normal,
+            uv: self.uv,
+            t: self.t,
+            front_face: self.front_face,
+            material,
+        }
     }
 }
 
@@ -109,23 +116,26 @@ pub enum SceneElement<'a> {
 }
 
 pub struct Scene<'a> {
-    root : &'a SceneElement<'a>
+    root: &'a SceneElement<'a>,
 }
 
 impl<'a> Scene<'a> {
-    pub fn new(root: &'a SceneElement<'a>) -> Self { Self { root } }
+    pub fn new(root: &'a SceneElement<'a>) -> Self {
+        Self { root }
+    }
 
-    pub fn hit(&'a self, ray: &Ray, t_range: &Range<f32>, rng: &mut rand_xoshiro::Xoroshiro128PlusPlus) -> Option<HitInteraction> {
+    pub fn hit(
+        &'a self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut rand_xoshiro::Xoroshiro128PlusPlus,
+    ) -> Option<HitInteraction> {
         self.root.hit(ray, t_range, rng)
     }
 }
 
 impl Geometry {
-    pub fn hit(
-        &self,
-        ray: &Ray,
-        t_range: &Range<f32>,
-    ) -> Option<GeoHitInteraction> {
+    pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<GeoHitInteraction> {
         match self {
             Geometry::Sphere(geo) => geo.hit(ray, t_range),
             Geometry::Rect(geo) => geo.hit(ray, t_range),
@@ -145,33 +155,55 @@ impl Geometry {
 
     pub fn get_world_scattering_provider(&self) -> Option<WorldScatteringDistributionProvider> {
         match self {
-            Geometry::Rect(geo) => Some(WorldScatteringDistributionProvider::Rect(geo.clone())),
+            Geometry::Rect(geo) => Some(WorldScatteringDistributionProvider::Rect(*geo)),
             _ => None,
         }
     }
-    pub fn partial_apply_transformation(&self, transformation : &Transformation) -> (Geometry, Option<Transformation>) {
+    pub fn partial_apply_transformation(
+        &self,
+        transformation: &Transformation,
+    ) -> (Geometry, Option<Transformation>) {
         match self {
             Geometry::Sphere(geo) => {
                 let center = transformation.apply_point(geo.center);
                 let radius = transformation.apply_distance(geo.radius);
                 (Geometry::Sphere(SphereGeometry::new(center, radius)), None)
-            },
+            }
             Geometry::Triangle(geo) => {
                 let positions = geo.positions.map(|p| transformation.apply_point(p));
                 let normals = geo.normals.map(|n| transformation.apply_normal(n));
-                (Geometry::Triangle(TriangleGeometry{positions, normals, texture_coords: geo.texture_coords}), None)
-            },
-            geo => (*geo, Some(*transformation)),
+                (
+                    Geometry::Triangle(TriangleGeometry {
+                        positions,
+                        normals,
+                        texture_coords: geo.texture_coords,
+                    }),
+                    None,
+                )
+            }
+            geo => (
+                *geo,
+                if transformation.is_zero() {
+                    None
+                } else {
+                    Some(*transformation)
+                },
+            ),
         }
     }
 }
 
 impl<'a> SceneElement<'a> {
-    pub fn hit(&'a self, ray: &Ray, t_range: &Range<f32>, rng: &mut rand_xoshiro::Xoroshiro128PlusPlus) -> Option<HitInteraction> {
+    pub fn hit(
+        &'a self,
+        ray: &Ray,
+        t_range: &Range<f32>,
+        rng: &mut rand_xoshiro::Xoroshiro128PlusPlus,
+    ) -> Option<HitInteraction> {
         match self {
             SceneElement::Group(elements) => {
                 let mut t_range_copy = t_range.clone();
-                let mut closest : Option<HitInteraction> = None;
+                let mut closest: Option<HitInteraction> = None;
                 for child in elements {
                     if let Some(hi) = child.hit(ray, &t_range_copy, rng) {
                         t_range_copy.end = hi.t;
@@ -179,32 +211,35 @@ impl<'a> SceneElement<'a> {
                     }
                 }
                 closest
-            },
-            SceneElement::Geometry(geo, material) => geo.hit(&ray, t_range).map(|h| h.to_hit_interaction(material)),
+            }
+            SceneElement::Geometry(geo, material) => geo
+                .hit(ray, t_range)
+                .map(|h| h.to_hit_interaction(material)),
             SceneElement::Transformation(elem, transform) => {
                 let ray_transformed = transform.reverse_ray(ray);
-                elem.hit(&ray_transformed, t_range, rng).map(|h| transform.apply_hit_interaction(h))
-            },
+                elem.hit(&ray_transformed, t_range, rng)
+                    .map(|h| transform.apply_hit_interaction(h))
+            }
         }
     }
 }
 
 impl Transformation {
-    pub fn reverse_ray(&self, ray : &Ray) -> Ray {
+    pub fn reverse_ray(&self, ray: &Ray) -> Ray {
         Ray {
             origin: self.reverse_point(ray.origin),
-            direction : self.reverse_normal(ray.direction),
+            direction: self.reverse_normal(ray.direction),
             time: ray.time,
         }
     }
 
-    pub fn apply_hit_interaction<'a>(&self, mut hi : HitInteraction<'a>) -> HitInteraction<'a> {
+    pub fn apply_hit_interaction<'a>(&self, mut hi: HitInteraction<'a>) -> HitInteraction<'a> {
         hi.position = self.apply_point(hi.position);
         hi.normal = self.apply_normal(hi.normal);
         hi
     }
 
-    pub fn apply_aabb(&self, aabb : Aabb) -> Aabb {
+    pub fn apply_aabb(&self, aabb: Aabb) -> Aabb {
         let corners = aabb.corners();
         for mut c in corners {
             self.apply_point_mut(&mut c)
@@ -213,7 +248,7 @@ impl Transformation {
     }
 }
 
-pub struct ConstantMedium<'a,> {
+pub struct ConstantMedium<'a> {
     boundary: &'a Geometry,
     phase_function: &'a Material<'a>,
     neg_inv_density: f32,
