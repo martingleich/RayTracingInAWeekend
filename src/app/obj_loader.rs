@@ -1,22 +1,12 @@
-use std::{io::BufRead, str::Chars};
+use std::str::Chars;
 
-use crate::mesh::Mesh;
-use ray_tracing_in_a_weekend::{Dir3, Material, Point3, Vec2, Vec2f, Vec3};
+use ray_tracing_in_a_weekend::{Dir3, Point3, Vec2, Vec2f, Vec3, triangle_geometry::TriangleGeometry};
 
-struct ObjLoader {
-    positions: Vec<Point3>,
-    normals: Vec<Dir3>,
-    texture_coords: Vec<Vec2f>,
-    vertices: Vec<crate::mesh::Vertex>,
-    triangles: Vec<[usize; 3]>,
-}
-
-pub fn load_obj_mesh<'a, R: BufRead>(reader: R, material: &'a Material) -> Result<Mesh<'a>> {
+pub fn load_obj_mesh<'a, R: std::io::BufRead>(reader: R) -> Result<Vec<TriangleGeometry>> {
     let mut loader = ObjLoader {
         positions: Vec::new(),
         normals: Vec::new(),
         texture_coords: Vec::new(),
-        vertices: Vec::new(),
         triangles: Vec::new(),
     };
     for maybe_line in reader.lines() {
@@ -26,7 +16,14 @@ pub fn load_obj_mesh<'a, R: BufRead>(reader: R, material: &'a Material) -> Resul
         }
     }
 
-    Ok(loader.get_mesh(material))
+    Ok(loader.triangles)
+}
+
+struct ObjLoader {
+    positions: Vec<Point3>,
+    normals: Vec<Dir3>,
+    texture_coords: Vec<Vec2f>,
+    triangles : Vec<TriangleGeometry>,
 }
 
 struct Scanner<'a> {
@@ -232,7 +229,11 @@ impl ObjLoader {
                 self.texture_coords.push(v);
             }
             LineType::F(vertex_ids) => {
-                let start_id = self.vertices.len();
+                let mut tri = TriangleGeometry{
+                    positions: [Point3::ORIGIN, Point3::ORIGIN, Point3::ORIGIN],
+                    normals: [Dir3::ZERO, Dir3::ZERO, Dir3::ZERO],
+                    texture_coords: [Vec2f::ZERO, Vec2f::ZERO, Vec2f::ZERO]
+                };
                 for (i, ids) in vertex_ids.iter().enumerate() {
                     let position = *self
                         .positions
@@ -252,23 +253,24 @@ impl ObjLoader {
                             .ok_or(ScannerError::NorIdOutOfRange(i))?,
                         None => todo!(),
                     };
-                    let cur_index = self.vertices.len();
-                    self.vertices.push(crate::mesh::Vertex {
-                        position,
-                        uv,
-                        normal,
-                    });
-                    if i >= 2 {
-                        self.triangles.push([start_id, cur_index - 1, cur_index]);
+                    if i < 2 {
+                        tri.positions[i] = position;
+                        tri.normals[i] = normal;
+                        tri.texture_coords[i] = uv;
+                    } else  {
+                        tri.positions[1] = tri.positions[2];
+                        tri.normals[1] = tri.normals[2];
+                        tri.texture_coords[1] = tri.texture_coords[2];
+
+                        tri.positions[2] = position;
+                        tri.normals[2] = normal;
+                        tri.texture_coords[2] = uv;
+                        self.triangles.push(tri);
                     }
                 }
             }
             _ => {}
         }
         Ok(())
-    }
-
-    fn get_mesh<'a>(self, material: &'a Material) -> Mesh<'a> {
-        Mesh::new(self.vertices, self.triangles, material)
     }
 }

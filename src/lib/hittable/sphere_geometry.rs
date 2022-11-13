@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::{Aabb, Dir3, Point3, Ray, Vec2f};
+use crate::{Aabb, Dir3, Point3, Ray, Vec2f, GeoHitInteraction};
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct SphereGeometry {
@@ -18,7 +18,7 @@ impl SphereGeometry {
         Aabb::new_radius(self.center, self.radius)
     }
 
-    pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<(Point3, Dir3, f32, Vec2f)> {
+    pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> Option<GeoHitInteraction> {
         let oc = ray.origin - self.center;
         let half_b = Dir3::dot(oc, ray.direction);
         let c = oc.length_squared() - self.radius * self.radius;
@@ -28,22 +28,22 @@ impl SphereGeometry {
         } else {
             let sqrtd = disc.sqrt();
             let root_small = -half_b - sqrtd;
-            let root: f32;
+            let t: f32;
             if t_range.contains(&root_small) {
-                root = root_small;
+                t = root_small;
             } else {
                 let root_large = -half_b + sqrtd;
                 if t_range.contains(&root_large) {
-                    root = root_large;
+                    t = root_large;
                 } else {
                     return None;
                 }
             }
-            let position = ray.at(root);
+            let position = ray.at(t);
             let surface_normal = (position - self.center) / self.radius;
             let uv = Self::get_sphere_uv(surface_normal);
 
-            Some((position, surface_normal, root, uv))
+            Some(GeoHitInteraction::new_from_ray(ray, &position, &surface_normal, t, uv))
         }
     }
 

@@ -5,14 +5,13 @@ use crate::{
     background_color::BackgroundColor,
     color::Color,
     common::{self, TRng},
-    hittable::Hittable,
     Camera, Dir3, MaterialScatteringDistribution, Ray, Size2i, Vec2f, WorldScatteringDistribution,
-    WorldScatteringDistributionProvider,
+    WorldScatteringDistributionProvider, Scene,
 };
 
 pub struct World<'a> {
     pub camera: Camera,
-    pub hittable: &'a dyn Hittable,
+    pub hittable: &'a Scene<'a>,
     pub background: BackgroundColor,
     pub scattering_distribution_provider: Option<WorldScatteringDistributionProvider>,
 }

@@ -14,13 +14,22 @@ fn main() -> Result<(), ImageError> {
     let image_width = args[2].parse::<i32>().unwrap();
     let samples_per_pixel = args[3].parse::<usize>().unwrap();
     let max_depth = args[4].parse::<i32>().unwrap();
+    let world_name = args[5].as_str();
 
     let thread_count = thread::available_parallelism().map_or(1, |x| x.get());
     eprintln!("Using {thread_count} threads.");
 
     let mut arena = bumpalo::Bump::new();
+    let wb = worlds::world_builder::WorldBuilder::new(&mut arena);
     let mut rng = TRng::from_seed([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    let world = worlds::create_world_cornell_box(&mut arena, &mut rng);
+    let world = match world_name {
+        "demo:cornell_box" => worlds::demo_worlds::create_world_cornell_box(&wb, &mut rng),
+        "demo:defocus_blur" => worlds::demo_worlds::create_world_defocus_blur(&wb, &mut rng),
+        "demo:simple_plane" => worlds::demo_worlds::create_world_simple_plane(&wb, &mut rng),
+        "demo:earth_mapped" => worlds::demo_worlds::create_world_earth_mapped(&wb, &mut rng),
+        "demo:suzanne" => worlds::demo_worlds::create_world_suzanne(&wb, &mut rng),
+        _ => panic!()
+    };
     let image_size = Size2i::new(
         image_width,
         (image_width as f32 * world.camera.aspect_ratio()) as i32,

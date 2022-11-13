@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use crate::hittable::HitInteraction;
 use crate::{color::Color, texture::Texture};
-use crate::{common, Point3};
+use crate::common;
 
 use crate::ray::Ray;
 use crate::vec3::Dir3;
@@ -43,9 +43,9 @@ impl MaterialScatteringDistribution {
 pub enum Material<'a> {
     Lambert { albedo: &'a Texture<'a> },
     Metal { albedo: &'a Texture<'a>, fuzz: f32 },
-    //Dielectric { index_of_refraction: f32 },
+    Dielectric { index_of_refraction: f32 },
     DiffuseLight { emit: &'a Texture<'a> },
-    //Isotropic { albedo: &'a Texture<'a> },
+    Isotropic { albedo: &'a Texture<'a> },
 }
 
 impl<'a> Material<'a> {
@@ -77,7 +77,6 @@ impl<'a> Material<'a> {
                     None
                 }
             }
-            /*
             Material::Dielectric {
                 index_of_refraction,
             } => {
@@ -101,30 +100,25 @@ impl<'a> Material<'a> {
                 } else {
                     Dir3::refract(ray.direction, interaction.normal, refraction_ratio)
                 };
-                let scattered = Ray::new(interaction.position, direction.unit(), ray.time);
+                let scattered = MaterialScatteringDistribution::Mirror(direction.unit());
                 Some((Color::WHITE, scattered))
             }
             Material::Isotropic { albedo } => {
-                let scattered = Ray::new(
-                    interaction.position,
-                    Dir3::new_from_arr(UnitSphere.sample(rng)),
-                    ray.time,
-                );
+                let scattered = MaterialScatteringDistribution::Mirror(Dir3::new_from_arr(UnitSphere.sample(rng)));
                 Some((albedo.sample(interaction), scattered))
             }
-             */
             _ => None,
         }
     }
 
     pub fn scattering_pdf(
         &self,
-        ray_in: &Ray,
+        _ray_in: &Ray,
         ray_scattered: &Ray,
         interaction: &HitInteraction,
     ) -> f32 {
         match *self {
-            Material::Lambert { albedo } => {
+            Material::Lambert { albedo:_ } => {
                 let cosine = Dir3::dot(interaction.normal, ray_scattered.direction);
                 let clamped_cosine = cosine.max(0.0);
                 clamped_cosine / PI

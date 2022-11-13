@@ -1,70 +1,42 @@
-use rand::Rng;
-
-use self::create_utils::*;
-use crate::obj_loader;
 use ray_tracing_in_a_weekend::*;
 
-mod create_utils {
-    use crate::{color::Color, material::Material, texture::Texture};
+use crate::obj_loader;
 
-    pub fn solid_lambert(arena: &bumpalo::Bump, color: Color) -> &Material {
-        let albedo = arena.alloc(Texture::Solid { color });
-        arena.alloc(Material::Lambert { albedo })
-    }
+use super::world_builder::WorldBuilder;
 
-    // pub fn solid_metal(arena: &bumpalo::Bump, color: Color, fuzz: f32) -> &Material {
-    //     let albedo = arena.alloc(Texture::Solid { color });
-    //     arena.alloc(Material::Metal { albedo, fuzz })
-    // }
-
-    pub fn solid_diffuse_light(arena: &bumpalo::Bump, color: Color) -> &Material {
-        let emit = arena.alloc(Texture::Solid { color });
-        arena.alloc(Material::DiffuseLight { emit })
-    }
-
-    // pub fn smoke(arena: &bumpalo::Bump, color: Color) -> &Material {
-    //     let albedo = arena.alloc(Texture::Solid { color });
-    //     arena.alloc(Material::Isotropic { albedo })
-    // }
-    // pub fn glass(arena: &bumpalo::Bump, index_of_refraction: f32) -> &Material {
-    //     arena.alloc(Material::Dielectric {
-    //         index_of_refraction,
-    //     })
-    // }
-}
-/*
 pub fn create_world_suzanne<'a>(
-    arena: &'a mut bumpalo::Bump,
-    _rng: &mut common::TRng,
-) -> World<impl Hittable + 'a> {
+    wb : &'a WorldBuilder<'a>,
+    _rng: &'a mut common::TRng,
+) -> World<'a> {
     let camera = Camera::build()
         .vertical_fov(40.0, 3.0 / 4.0)
         .position(Point3::new(0.0, 2.0, 10.0))
         .look_at(Dir3::UP, Point3::new(0.0, 0.0, 0.0))
         .build();
 
-    let ground_material = solid_lambert(arena, Color::new_rgb(0.4, 0.4, 0.4));
-    let material = glass(arena, 1.5);
+    let mat_ground = wb.material_lambert_solid(Color::new_rgb(0.4, 0.4, 0.4));
+    let mat_monkey = wb.material_lambert_solid(Color::new_rgb(1.0, 0.2, 0.2));
     let path = std::path::Path::new("input/suzanne.obj");
     let file = std::fs::OpenOptions::new().read(true).open(path).unwrap();
     let reader = std::io::BufReader::new(file);
-    let cube = obj_loader::load_obj_mesh(reader, material).unwrap();
-    let hittable: Vec<Box<dyn Hittable>> = vec![
-        Box::new(cube),
-        Box::new(Sphere::new(
-            Point3::new(0.0, -1000.0, 0.0),
-            1000.1,
-            ground_material,
-        )),
-    ];
+    let monkey = obj_loader::load_obj_mesh(reader).unwrap();
+    let mut group = wb.new_group();
+    for tri in monkey {
+        let geo_tri = Geometry::Triangle(tri);
+        group.add(wb.new_obj(geo_tri).set_material(mat_monkey))
+    }
+    group.add(wb.new_obj_sphere(1000.1).translate(Dir3::new(0.0, -1000.0, 0.0)).set_material(mat_ground));
 
+    let hittable = wb.group_to_hittable(group, &camera.time_interval);
     World {
         background: BackgroundColor::Sky,
         camera,
         hittable,
+        scattering_distribution_provider: None,
     }
 }
 
+/*
 pub fn create_world_final_scene2<'a>(
     arena: &'a mut bumpalo::Bump,
     rng: &mut common::TRng,
@@ -336,7 +308,7 @@ pub fn create_world_cornell_box_smoke<'a>(
 }
  */
 pub fn create_world_cornell_box<'a>(
-    arena: &'a mut bumpalo::Bump,
+    wb : &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
 ) -> World<'a> {
     let hsize = 278.0;
@@ -346,150 +318,78 @@ pub fn create_world_cornell_box<'a>(
         .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
         .build();
 
-    let red = solid_lambert(arena, Color::new_rgb(0.65, 0.05, 0.05));
-    let white = solid_lambert(arena, Color::new_rgb(0.73, 0.73, 0.73));
-    let green = solid_lambert(arena, Color::new_rgb(0.12, 0.45, 0.15));
-    let light = solid_diffuse_light(arena, Color::new_rgb(15.0, 15.0, 15.0));
+    let red = wb.material_lambert_solid(Color::new_rgb(0.65, 0.05, 0.05));
+    let white = wb.material_lambert_solid(Color::new_rgb(0.73, 0.73, 0.73));
+    let green = wb.material_lambert_solid(Color::new_rgb(0.12, 0.45, 0.15));
+    let light = wb.material_diffuse_light_solid(Color::new_rgb(15.0, 15.0, 15.0));
 
-    let walls : &dyn Hittable = arena.alloc(vec![
-        Rect::new_yz(
-            Point3::new(0.0, hsize, hsize),
-            2.0 * hsize,
-            2.0 * hsize,
-            red,
-        ),
-        Rect::new_yz(
-            Point3::new(2.0 * hsize, hsize, hsize),
-            2.0 * hsize,
-            2.0 * hsize,
-            green,
-        ),
-        Rect::new_xz(
-            Point3::new(hsize, 0.0, hsize),
-            2.0 * hsize,
-            2.0 * hsize,
-            white,
-        ),
-        Rect::new_xz(
-            Point3::new(hsize, 2.0 * hsize, hsize),
-            2.0 * hsize,
-            2.0 * hsize,
-            white,
-        ),
-        Rect::new_xy(
-            Point3::new(hsize, hsize, 2.0 * hsize),
-            2.0 * hsize,
-            2.0 * hsize,
-            white,
-        ),
-        Rect::new_xz(
-            Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
-            130.0,
-            130.0,
-            light,
-        ),
-    ]);
-    let boxes : &dyn Hittable = {
-        let box1_base = arena.alloc(AxisAlignedBox::new(
-            &Aabb {
-                min: Point3::new(0.0, 0.0, 0.0),
-                max: Point3::new(165.0, 330.0, 165.0),
-            },
-            white,
-        ));
-        let box1_rot = arena.alloc(TransformedHittable {
-            hittable: box1_base,
-            transformation: RotationAroundUp::new(15.0),
-        });
-        let box1 = TransformedHittable {
-            hittable: box1_rot,
-            transformation: Translation {
-                offset: Dir3::new(265.0, 0.0, 295.0),
-            },
-        };
+    let mut group = wb.new_group();
+    group.add(wb.new_obj_rect_yz(Point3::new(0.0, hsize, hsize), 2.0 * hsize, 2.0 * hsize).set_material(red));
+    group.add(wb.new_obj_rect_yz(Point3::new(2.0 * hsize, hsize, hsize), 2.0 * hsize, 2.0 * hsize).set_material(green));
+    group.add(wb.new_obj_rect_xz(Point3::new(hsize, 0.0, hsize), 2.0 * hsize, 2.0 * hsize).set_material(white));
+    group.add(wb.new_obj_rect_xz(Point3::new(hsize, 2.0 * hsize, hsize), 2.0 * hsize, 2.0 * hsize).set_material(white));
+    group.add(wb.new_obj_rect_xy(Point3::new(hsize, hsize, 2.0 * hsize), 2.0 * hsize, 2.0 * hsize).set_material(white));
+    let light_obj = wb.new_obj_rect_xz(Point3::new(hsize, 2.0 * hsize - 1.0, hsize), 130.0, 130.0).set_material(light);
+    group.add(light_obj);
 
-        let box2_base = arena.alloc(AxisAlignedBox::new(
-            &Aabb {
-                min: Point3::new(0.0, 0.0, 0.0),
-                max: Point3::new(165.0, 165.0, 165.0),
-            },
-            white,
-        ));
-        let box2_rot = arena.alloc(TransformedHittable {
-            hittable: box2_base,
-            transformation: RotationAroundUp::new(-18.0),
-        });
-        let box2 = TransformedHittable {
-            hittable: box2_rot,
-            transformation: Translation {
-                offset: Dir3::new(130.0, 0.0, 65.0),
-            },
-        };
-        arena.alloc(vec![box1, box2])
-    };
+    group.add(wb
+        .new_obj_box(165.0, 330.0, 165.0)
+        .rotate_around_up(15.0)
+        .translate(Dir3::new(265.0, 0.0, 295.0))
+        .set_material(white));
 
-    let vec = vec![walls, boxes];
-    let alloced = arena.alloc(vec);
-    let hittable : &dyn Hittable = alloced;
+    group.add(wb
+        .new_obj_box(165.0, 165.0, 165.0)
+        .rotate_around_up(-18.0)
+        .translate(Dir3::new(130.0, 0.0, 65.0))
+        .set_material(white));
 
-    let light_geo = Rect::new_xz(
-        Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
-        130.0,
-        130.0,
-        light,
-    ).geometry;
-
+    let hittable = wb.group_to_hittable(group, &camera.time_interval);
     World {
         background: BackgroundColor::Solid {
             color: Color::BLACK,
         },
         camera,
         hittable,
-        scattering_distribution_provider: Some(WorldScatteringDistributionProvider::Rect(
-            light_geo,
-        )),
+        scattering_distribution_provider: light_obj.get_world_scattering_provider()
     }
 }
 
-/*
+
 pub fn create_world_simple_plane<'a>(
-    arena: &'a mut bumpalo::Bump,
+    wb : &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
-) -> World<impl Hittable + 'a> {
-    // A single rectangle with a solid
+) -> World<'a> {
     let camera = Camera::build()
         .vertical_fov(60.0, 9.0 / 16.0)
         .position(Point3::new(0.0, 6.0, 10.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
 
-    let tex_white = arena.alloc(Texture::Solid {
-        color: 100.0 * Color::new_rgb(1.0, 1.0, 1.0),
-    });
-    let tex_blue = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.0, 0.0, 0.4),
-    });
-    let mat_emit = arena.alloc(Material::DiffuseLight { emit: tex_white });
-    let mat_floor = arena.alloc(Material::Lambert { albedo: tex_blue });
+    let mat_emit = wb.material_diffuse_light_solid(100.0 * Color::new_rgb(1.0, 1.0, 1.0));
+    let mat_floor = wb.material_lambert_solid(Color::new_rgb(0.0, 0.0, 0.4));
 
-    let hittable = vec![
-        Rect::new_xy(Point3::new(0.0, 2.0, 0.0), 1.0, 1.0, mat_emit),
-        Rect::new_xz(Point3::ORIGIN, 10.0, 10.0, mat_floor),
-    ];
+    let mut scene = wb.new_group();
+    let obj_light = wb.new_obj_rect_xy(Point3::new(0.0, 2.0, 0.0), 1.0, 1.0).set_material(mat_emit);
+    scene.add(obj_light);
+    scene.add(wb.new_obj_rect_xz(Point3::ORIGIN, 10.0, 10.0).set_material(mat_floor));
 
+    let hittable = wb.group_to_hittable(scene, &camera.time_interval);
     World {
         camera,
         hittable,
         background: BackgroundColor::Solid {
             color: Color::new_rgb(0.1, 0.1, 0.1),
         },
+        scattering_distribution_provider: obj_light.get_world_scattering_provider(),
     }
 }
 
+
 pub fn create_world_earth_mapped<'a>(
-    arena: &'a mut bumpalo::Bump,
+    wb: &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
-) -> World<impl Hittable + 'a> {
+) -> World<'a> {
     // A single sphere with a image texture
     let camera = Camera::build()
         .vertical_fov(60.0, 16.0 / 19.0)
@@ -497,25 +397,21 @@ pub fn create_world_earth_mapped<'a>(
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
 
-    let path = std::path::Path::new("input/earthmap.jpg");
-    let file = std::fs::OpenOptions::new().read(true).open(path).unwrap();
-    let reader = std::io::BufReader::new(file);
-    let image = arena.alloc(image::load(reader, image::ImageFormat::Jpeg).unwrap());
+    let tex_earth = wb.texture_image_from_file(std::path::Path::new("input/earthmap.jpg"), image::ImageFormat::Jpeg);
+    let mat_earth = wb.material_lambert(tex_earth);
 
-    let tex_earth = arena.alloc(Texture::Image {
-        image: image.as_rgb8().unwrap(),
-    });
-    let mat_earth = arena.alloc(Material::Lambert { albedo: tex_earth });
-
-    let hittable = Sphere::new(Point3::ORIGIN, 2.0, mat_earth);
-
+    let mut scene = wb.new_group();
+    scene.add(wb.new_obj_sphere(2.0).set_material(mat_earth));
+    let hittable = wb.group_to_hittable(scene, &camera.time_interval);
     World {
         camera,
         hittable,
         background: BackgroundColor::Sky,
+        scattering_distribution_provider : None,
     }
 }
 
+/*
 pub fn create_world_moving_spheres<'a>(
     arena: &'a mut bumpalo::Bump,
     _rng: &'a mut common::TRng,
@@ -661,66 +557,37 @@ pub fn create_world_random_scene<'a>(
         background: BackgroundColor::Sky,
     }
 }
+*/
 
 pub fn create_world_defocus_blur<'a>(
-    arena: &'a mut bumpalo::Bump,
+    wb: &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
-) -> World<impl Hittable + 'a> {
+) -> World<'a> {
     let camera = Camera::build()
         .vertical_fov(60.0, 9.0 / 16.0)
         .position(Point3::ORIGIN + Dir3::BACKWARD * 3.0 + Dir3::UP * 3.0 + 3.0 * Dir3::RIGHT)
         .look_at_focus(Dir3::UP, Point3::ORIGIN + Dir3::FORWARD)
         .aperture(0.1)
         .build();
-    let tex = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.8, 0.8, 0.0),
-    });
-    let material_ground = arena.alloc(Material::Lambert { albedo: tex });
-    let tex = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.7, 0.3, 0.3),
-    });
-    let material_center = arena.alloc(Material::Lambert { albedo: tex });
-    let tex = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.6, 0.6, 0.8),
-    });
-    let material_left = arena.alloc(Material::Metal {
-        albedo: tex,
-        fuzz: 0.05,
-    });
-    let tex = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.8, 0.6, 0.2),
-    });
-    let material_right = arena.alloc(Material::Metal {
-        albedo: tex,
-        fuzz: 0.5,
-    });
-    let material_front = arena.alloc(Material::Dielectric {
-        index_of_refraction: 1.5,
-    });
-    let hittable = vec![
-        Sphere::new(Point3::ORIGIN + Dir3::DOWN * 100.5, 100.0, material_ground),
-        Sphere::new(Point3::ORIGIN + Dir3::FORWARD, 0.5, material_center),
-        Sphere::new(
-            Point3::ORIGIN + Dir3::LEFT + Dir3::FORWARD,
-            0.5,
-            material_left,
-        ),
-        Sphere::new(
-            Point3::ORIGIN + Dir3::RIGHT + Dir3::FORWARD,
-            0.5,
-            material_right,
-        ),
-        Sphere::new(
-            Point3::ORIGIN + 0.5 * Dir3::LEFT + 0.3 * Dir3::UP,
-            0.3,
-            material_front,
-        ),
-    ];
+    
+    let material_ground = wb.material_lambert_solid(Color::new_rgb(0.8, 0.8, 0.0));
+    let material_center = wb.material_lambert_solid(Color::new_rgb(0.7, 0.3, 0.3));
+    let material_left = wb.material_metal_solid(Color::new_rgb(0.6, 0.6, 0.8), 0.05);
+    let material_right = wb.material_metal_solid(Color::new_rgb(0.8, 0.6, 0.2), 0.5);
+    let material_front = wb.material_dielectric(1.5);
 
+    let mut group = wb.new_group();
+    group.add(wb.new_obj_sphere(100.0).translate(Dir3::DOWN * 100.5).set_material(material_ground));
+    group.add(wb.new_obj_sphere(0.5).translate(Dir3::FORWARD).set_material(material_center));
+    group.add(wb.new_obj_sphere(0.5).translate(Dir3::LEFT + Dir3::FORWARD).set_material(material_left));
+    group.add(wb.new_obj_sphere(0.5).translate(Dir3::RIGHT + Dir3::FORWARD).set_material(material_right));
+    group.add(wb.new_obj_sphere(0.3).translate(0.5 * Dir3::LEFT + 0.3 * Dir3::UP).set_material(material_front));
+
+    let hittable = wb.group_to_hittable(group, &camera.time_interval);
     World {
         camera,
         hittable,
         background: BackgroundColor::Sky,
+        scattering_distribution_provider: None,
     }
 }
-*/

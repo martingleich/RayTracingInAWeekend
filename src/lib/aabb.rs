@@ -3,7 +3,7 @@ use std::ops::Range;
 use crate::{
     math,
     ray::Ray,
-    vec3::{Dir3, Point3},
+    vec3::{Dir3, Point3}, GeoHitInteraction, Vec2f,
 };
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 pub struct Aabb {
@@ -46,7 +46,7 @@ impl Aabb {
         }
     }
 
-    pub fn hit(&self, ray: &Ray, t_range: &Range<f32>) -> bool {
+    pub fn hit_cond(&self, ray: &Ray, t_range: &Range<f32>) -> bool {
         for i in 0..3 {
             let (t0, t1) = math::minmax(
                 (self.min.0.e[i] - ray.origin.0.e[i]) / ray.direction.0.e[i],
@@ -59,6 +59,34 @@ impl Aabb {
             }
         }
         true
+    }
+
+    pub fn hit(
+        &self,
+        ray: &Ray,
+        t_range: &Range<f32>
+    ) -> Option<GeoHitInteraction> {
+        let ((near_t, near_plane), (far_t, far_plane)) =
+            self.intersections_line(ray.origin, ray.direction)?;
+        let (t, plane) = if t_range.contains(&near_t) {
+            (near_t, near_plane)
+        } else if t_range.contains(&far_t) {
+            (far_t, far_plane)
+        } else {
+            return None;
+        };
+        let position = ray.origin + t * ray.direction;
+        let center = (self.max.0.e[plane] + self.min.0.e[plane]) * 0.5;
+
+        let mut surface_normal = Dir3::ZERO;
+        surface_normal.0.e[plane] = (position.0.e[plane] - center).signum();
+        return Some(GeoHitInteraction::new_from_ray(
+            ray,
+            &position,
+            &surface_normal,
+            t,
+            Vec2f::ZERO,
+        ));
     }
     pub fn intersections_line(
         &self,

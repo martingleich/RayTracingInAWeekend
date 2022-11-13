@@ -1,89 +1,84 @@
 use crate::vec3::{Dir3, Point3, Vec3};
 
-pub trait Transformation: Send + Sync {
-    fn apply_point_mut(&self, point: &mut Point3);
-    fn apply_dir_mut(&self, dir: &mut Dir3);
-
-    fn reverse_point_mut(&self, point: &mut Point3);
-    fn reverse_dir_mut(&self, dir: &mut Dir3);
-
-    fn apply_point(&self, mut point: Point3) -> Point3 {
-        self.apply_point_mut(&mut point);
-        point
-    }
-    fn apply_dir(&self, mut dir: Dir3) -> Dir3 {
-        self.apply_dir_mut(&mut dir);
-        dir
-    }
-    fn reverse_point(&self, mut point: Point3) -> Point3 {
-        self.reverse_point_mut(&mut point);
-        point
-    }
-    fn reverse_dir(&self, mut dir: Dir3) -> Dir3 {
-        self.reverse_dir_mut(&mut dir);
-        dir
-    }
-}
-
 #[derive(PartialEq, Debug, Clone, Copy)]
-pub struct Translation {
-    pub offset: Dir3,
+pub struct Transformation {
+    offset : Dir3,
+    y_sine : f32,
+    y_cosine : f32,
 }
 
-impl Transformation for Translation {
-    fn apply_point_mut(&self, point: &mut Point3) {
+impl Transformation {
+    pub const ZERO : Transformation = Transformation {
+        offset: Dir3::ZERO,
+        y_sine: 0.0,
+        y_cosine: 1.0,
+    };
+    pub fn translate_xyz(&self, x :f32, y:f32, z:f32) -> Self {
+        self.translate(Dir3::new(x, y, z))
+    }
+    pub fn translate(&self, offset : Dir3) -> Self {
+        let mut result = *self;
+        result.offset += offset;
+        result
+    }
+    pub fn rotate_around_up(&self, angle : f32) -> Self {
+        let mut result = *self;
+        let (s, c) = angle.to_radians().sin_cos();
+        rotate_around_up(c, s, &mut result.offset.0);
+        let mut r = Vec3::new(self.y_sine, 0.0, self.y_cosine);
+        rotate_around_up(c, s, &mut r);
+        result.y_sine = r.e[0];
+        result.y_cosine = r.e[2];
+        result
+    }
+    pub fn apply_point_mut(&self, point: &mut Point3) {
+        rotate_around_up(self.y_cosine, self.y_sine, &mut point.0);
         *point += self.offset;
     }
 
-    fn apply_dir_mut(&self, _dir: &mut Dir3) {}
+    pub fn apply_normal_mut(&self, dir: &mut Dir3) {
+        rotate_around_up(self.y_cosine, self.y_sine, &mut dir.0);
+    }
 
-    fn reverse_point_mut(&self, point: &mut Point3) {
+    pub fn reverse_point_mut(&self, point: &mut Point3) {
         *point -= self.offset;
+        rotate_around_up(self.y_cosine, -self.y_sine, &mut point.0);
     }
 
-    fn reverse_dir_mut(&self, _dir: &mut Dir3) {}
+    pub fn reverse_normal_mut(&self, dir: &mut Dir3) {
+        rotate_around_up(self.y_cosine, -self.y_sine, &mut dir.0);
+    }
+
+    pub fn apply_point(&self, mut point: Point3) -> Point3 {
+        self.apply_point_mut(&mut point);
+        point
+    }
+    pub fn apply_normal(&self, mut dir: Dir3) -> Dir3 {
+        self.apply_normal_mut(&mut dir);
+        dir
+    }
+    pub fn reverse_point(&self, mut point: Point3) -> Point3 {
+        self.reverse_point_mut(&mut point);
+        point
+    }
+    pub fn reverse_normal(&self, mut dir: Dir3) -> Dir3 {
+        self.reverse_normal_mut(&mut dir);
+        dir
+    }
+    pub fn apply_distance(&self, distance : f32) -> f32 {
+        distance
+    }
+    pub fn reverse_distance(&self, distance : f32) -> f32 {
+        distance
+    }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub struct RotationAroundUp {
-    pub sin_angle: f32,
-    pub cos_angle: f32,
+impl Default for Transformation {
+    fn default() -> Self { Self::ZERO }
 }
 
-impl RotationAroundUp {
-    pub fn new(degrees: f32) -> Self {
-        let (sin_angle, cos_angle) = degrees.to_radians().sin_cos();
-        Self {
-            sin_angle,
-            cos_angle,
-        }
-    }
-}
-
-fn rotate_around_up(rot: &RotationAroundUp, c: &mut Vec3<f32>) {
-    let (x, y) = (c.e[0], c.e[2]);
-    c.e[0] = rot.cos_angle * x + rot.sin_angle * y;
-    c.e[2] = -rot.sin_angle * x + rot.cos_angle * y;
-}
-fn inv_rotate_around_up(rot: &RotationAroundUp, c: &mut Vec3<f32>) {
-    let (x, y) = (c.e[0], c.e[2]);
-    c.e[0] = rot.cos_angle * x - rot.sin_angle * y;
-    c.e[2] = rot.sin_angle * x + rot.cos_angle * y;
-}
-impl Transformation for RotationAroundUp {
-    fn apply_point_mut(&self, point: &mut Point3) {
-        rotate_around_up(self, &mut point.0);
-    }
-
-    fn apply_dir_mut(&self, dir: &mut Dir3) {
-        rotate_around_up(self, &mut dir.0);
-    }
-
-    fn reverse_point_mut(&self, point: &mut Point3) {
-        inv_rotate_around_up(self, &mut point.0);
-    }
-
-    fn reverse_dir_mut(&self, dir: &mut Dir3) {
-        inv_rotate_around_up(self, &mut dir.0);
-    }
+fn rotate_around_up(c : f32, s : f32, v: &mut Vec3<f32>) {
+    let (x, y) = (v.e[0], v.e[2]);
+    v.e[0] = c * x + s * y;
+    v.e[2] = -s * x + c * y;
 }

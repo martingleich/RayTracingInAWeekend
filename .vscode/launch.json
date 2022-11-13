@@ -20,7 +20,7 @@
                     "kind": "bin"
                 },
             },
-            "args": ["output/image.png", "800", "3900", "50"],
+            "args": ["output/image.png", "${input:resolution}", "${input:samples}", "50", "${input:scene}"],
             "cwd": "${workspaceFolder}"
         },
         {
@@ -39,8 +39,28 @@
                     "kind": "bin"
                 }
             },
-            "args": ["output/image.png", "1600", "10000", "50"],
+            "args": ["output/image.png", "${input:resolution}", "${input:samples}", "50", "${input:scene}"],
             "cwd": "${workspaceFolder}"
         },
+    ],
+    "inputs": [
+        {
+            "id": "scene",
+            "type": "promptString",
+            "default": "demo:suzanne",
+            "description": "The path of the scene to render"
+        },
+        {
+            "id": "resolution",
+            "type": "promptString",
+            "default": "800",
+            "description": "The width of the image in pixels",
+        },
+        {
+            "id": "samples",
+            "type": "promptString",
+            "default": "25",
+            "description": "The number of samples per pixel",
+        }
     ]
 }
