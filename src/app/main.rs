@@ -29,6 +29,7 @@ fn main() -> Result<(), ImageError> {
         "demo:earth_mapped" => worlds::demo_worlds::create_world_earth_mapped,
         "demo:suzanne" => worlds::demo_worlds::create_world_suzanne,
         "demo:moving_spheres" => worlds::demo_worlds::create_world_moving_spheres,
+        "demo:final_scene1" => worlds::demo_worlds::create_world_final_scene1,
         _ => panic!(),
     }(&wb, &mut rng);
     let image_size = Size2i::new(

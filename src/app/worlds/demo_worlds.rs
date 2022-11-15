@@ -1,3 +1,4 @@
+use rand::Rng;
 use ray_tracing_in_a_weekend::*;
 
 use super::world_builder::WorldBuilder;
@@ -8,10 +9,10 @@ pub fn create_world_suzanne<'a>(wb: &'a WorldBuilder<'a>, _rng: &'a mut common::
         .position(Point3::new(0.0, 2.0, 10.0))
         .look_at(Dir3::UP, Point3::new(0.0, 0.0, 0.0))
         .build();
-
+    let background = BackgroundColor::Sky;
     let mat_ground = wb.material_lambert_solid(Color::new_rgb(0.4, 0.4, 0.4));
     let mat_monkey = wb.material_lambert_solid(Color::new_rgb(1.0, 0.2, 0.2));
-    let group = wb
+    let scene = wb
         .new_group()
         .add(wb.new_mesh_from_file_obj_uniform_material(
             std::path::Path::new("input/suzanne.obj"),
@@ -23,13 +24,7 @@ pub fn create_world_suzanne<'a>(wb: &'a WorldBuilder<'a>, _rng: &'a mut common::
         )
         .build();
 
-    let (hittable, scattering_distribution_provider) = group.finish(wb, &camera.time_interval);
-    World {
-        background: BackgroundColor::Sky,
-        camera,
-        hittable,
-        scattering_distribution_provider,
-    }
+    scene.finish(wb, background, camera)
 }
 
 /*
@@ -313,13 +308,14 @@ pub fn create_world_cornell_box<'a>(
         .position(Point3::new(hsize, hsize, -800.0))
         .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
         .build();
+    let background = BackgroundColor::Solid { color: Color::BLACK };
 
     let red = wb.material_lambert_solid(Color::new_rgb(0.65, 0.05, 0.05));
     let white = wb.material_lambert_solid(Color::new_rgb(0.73, 0.73, 0.73));
     let green = wb.material_lambert_solid(Color::new_rgb(0.12, 0.45, 0.15));
     let light = wb.material_diffuse_light_solid(Color::new_rgb(15.0, 15.0, 15.0));
 
-    let group = wb
+    let scene = wb
         .new_group()
         .add(wb.new_obj_rect_yz(
             Point3::new(0.0, hsize, hsize),
@@ -372,15 +368,7 @@ pub fn create_world_cornell_box<'a>(
         )
         .build();
 
-    let (hittable, scattering_distribution_provider) = group.finish(wb, &camera.time_interval);
-    World {
-        background: BackgroundColor::Solid {
-            color: Color::BLACK,
-        },
-        camera,
-        hittable,
-        scattering_distribution_provider,
-    }
+    scene.finish(wb, background, camera)
 }
 
 pub fn create_world_simple_plane<'a>(
@@ -392,6 +380,9 @@ pub fn create_world_simple_plane<'a>(
         .position(Point3::new(0.0, 6.0, 10.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
+    let background = BackgroundColor::Solid {
+            color: Color::new_rgb(0.1, 0.1, 0.1),
+        };
 
     let mat_emit = wb.material_diffuse_light_solid(100.0 * Color::new_rgb(1.0, 1.0, 1.0));
     let mat_floor = wb.material_lambert_solid(Color::new_rgb(0.0, 0.0, 0.4));
@@ -405,15 +396,7 @@ pub fn create_world_simple_plane<'a>(
         .add(wb.new_obj_rect_xz(Point3::ORIGIN, 10.0, 10.0, mat_floor))
         .build();
 
-    let (hittable, scattering_distribution_provider) = scene.finish(wb, &camera.time_interval);
-    World {
-        camera,
-        hittable,
-        background: BackgroundColor::Solid {
-            color: Color::new_rgb(0.1, 0.1, 0.1),
-        },
-        scattering_distribution_provider,
-    }
+    scene.finish(wb, background, camera)
 }
 
 pub fn create_world_earth_mapped<'a>(
@@ -426,6 +409,7 @@ pub fn create_world_earth_mapped<'a>(
         .position(Point3::new(0.0, 2.0, 10.0))
         .look_at(Dir3::UP, Point3::ORIGIN)
         .build();
+    let background = BackgroundColor::Sky;
 
     let tex_earth = wb.texture_image_from_file(
         std::path::Path::new("input/earthmap.jpg"),
@@ -437,13 +421,7 @@ pub fn create_world_earth_mapped<'a>(
         .new_group()
         .add(wb.new_obj_sphere(2.0, mat_earth))
         .build();
-    let (hittable, scattering_distribution_provider) = scene.finish(wb, &camera.time_interval);
-    World {
-        camera,
-        hittable,
-        background: BackgroundColor::Sky,
-        scattering_distribution_provider,
-    }
+    scene.finish(wb, background, camera)
 }
 
 pub fn create_world_moving_spheres<'a>(
@@ -460,6 +438,7 @@ pub fn create_world_moving_spheres<'a>(
         .look_at(Dir3::UP, Point3::new(0.0, 2.0, 0.0))
         .motion_blur(0.0, 0.5)
         .build();
+    let background = BackgroundColor::Sky;
 
     let tex_black = wb.texture_solid(Color::new_rgb(0.0, 0.0, 0.0));
     let tex_white = wb.texture_solid(Color::new_rgb(1.0, 1.0, 1.0));
@@ -490,20 +469,13 @@ pub fn create_world_moving_spheres<'a>(
         )
         .build();
 
-    let (hittable, scattering_distribution_provider) = scene.finish(wb, &camera.time_interval);
-    World {
-        camera,
-        hittable,
-        background: BackgroundColor::Sky,
-        scattering_distribution_provider,
-    }
+    scene.finish(wb, background, camera)
 }
 
-/*
-pub fn create_world_random_scene<'a>(
-    arena: &'a mut bumpalo::Bump,
+pub fn create_world_final_scene1<'a>(
+    wb: &'a WorldBuilder<'a>,
     rng: &'a mut common::TRng,
-) -> World<impl Hittable + 'a> {
+) -> World<'a> {
     let camera = Camera::build()
         .vertical_fov(60.0, 9.0 / 16.0)
         .position(Point3::new(13.0, 2.0, 3.0))
@@ -511,76 +483,62 @@ pub fn create_world_random_scene<'a>(
         .focus_distance(10.0)
         .aperture(0.1)
         .build();
+    let background = BackgroundColor::Sky;
 
-    let hittable = {
-        let mut world = Vec::<Sphere>::new();
-        let ground_tex = arena.alloc(Texture::Solid {
-            color: Color::new_rgb(0.5, 0.5, 0.5),
-        });
-        let ground_material = arena.alloc(Material::Lambert { albedo: ground_tex });
-        let ground_radius = 1000.0;
-        let ground_center = Point3::new(0.0, -ground_radius, 0.0);
-        world.push(Sphere::new(ground_center, ground_radius, ground_material));
-        let rand_color = |rng: &mut rand_xoshiro::Xoroshiro128PlusPlus| -> Color {
-            Color::new_rgb_arr(rng.gen::<[f32; 3]>())
-        };
-        let material_glass = &*arena.alloc(Material::Dielectric {
-            index_of_refraction: 1.5,
-        });
-        for a in -11..=11 {
-            for b in -11..=11 {
-                let center = Point3::new(
-                    a as f32 + 0.9 * rng.gen::<f32>(),
-                    0.2,
-                    b as f32 + 0.9 * rng.gen::<f32>(),
-                );
-                if (center - Point3::new(4.0, 0.2, 0.0)).length() > 0.9 {
-                    let material_sample = rng.gen::<f32>();
-                    let material = if material_sample < 0.8 {
-                        let albedo = Color::convolution(rand_color(rng), rand_color(rng));
-                        let tex = arena.alloc(Texture::Solid { color: albedo });
-                        arena.alloc(Material::Lambert { albedo: tex })
-                    } else if material_sample < 0.95 {
-                        let albedo = rand_color(rng);
-                        let fuzz = rng.gen_range(0.0..0.5);
-                        let tex = arena.alloc(Texture::Solid { color: albedo });
-                        arena.alloc(Material::Metal { albedo: tex, fuzz })
-                    } else {
-                        material_glass
-                    };
-
-                    let small_radius = 0.2;
-                    let real_center = ground_center
-                        + (center - ground_center).with_length(ground_radius + small_radius);
-                    world.push(Sphere::new(real_center, small_radius, material));
-                }
+    let mat_ground = wb.material_lambert_solid(Color::new_rgb(0.5, 0.5, 0.5));
+    let mut scene = wb.new_group();
+    let ground_radius = 1000.0;
+    let ground_center = Dir3::new(0.0, -ground_radius, 0.0);
+    scene = scene.add(wb.new_obj_sphere_ground(ground_radius, 0.0, mat_ground));
+    let gen_color = |rng: &mut common::TRng| -> Color {
+        Color::new_rgb_arr(rng.gen::<[f32; 3]>())
+    };
+    let gen_muted_color = |rng: &mut common::TRng| -> Color {
+        Color::convolution(gen_color(rng), gen_color(rng))
+    };
+    let material_glass = wb.material_dielectric(1.5);
+    let gen_material = |rng: &mut common::TRng| -> &Material {
+        let material_sample = rng.gen::<f32>();
+        if material_sample < 0.8 {
+            wb.material_lambert_solid(gen_muted_color(rng))
+        } else if material_sample < 0.95 {
+            wb.material_metal_solid(gen_color(rng), rng.gen_range(0.0..0.5))
+        } else {
+            material_glass
+        }
+    };
+    let gen_offset = |rng: &mut common::TRng| -> Dir3 {
+        Dir3::new(
+        rng.gen::<f32>() * 0.9,
+        0.0,
+        rng.gen::<f32>() * 0.9)
+    };
+    
+    for a in -11..=11 {
+        for b in -11..=11 {
+            let center = Dir3::new(
+                a as f32,
+                0.2,
+                b as f32,
+            ) + gen_offset(rng);
+            if (center - Dir3::new(4.0, 0.2, 0.0)).length() > 0.9 {
+                let material = gen_material(rng);
+                let small_radius = 0.2;
+                let real_center = ground_center
+                    + (center - ground_center).with_length(ground_radius + small_radius);
+                scene = scene.add(wb.new_obj_sphere(small_radius, material).translate(real_center));
             }
         }
-
-        world.push(Sphere::new(Point3::new(0.0, 1.0, 0.0), 1.0, material_glass));
-        let tex = arena.alloc(Texture::Solid {
-            color: Color::new_rgb(0.4, 0.2, 0.1),
-        });
-        let material = arena.alloc(Material::Lambert { albedo: tex });
-        world.push(Sphere::new(Point3::new(-4.0, 1.0, 0.0), 1.0, material));
-        let tex = arena.alloc(Texture::Solid {
-            color: Color::new_rgb(0.7, 0.6, 0.5),
-        });
-        let material = arena.alloc(Material::Metal {
-            albedo: tex,
-            fuzz: 0.0,
-        });
-        world.push(Sphere::new(Point3::new(4.0, 1.0, 0.0), 1.0, material));
-        world
-    };
-
-    World {
-        camera,
-        hittable,
-        background: BackgroundColor::Sky,
     }
+
+    scene = scene.add(wb.new_obj_sphere(1.0, material_glass).translate(Dir3::new(0.0, 1.0, 0.0)));
+    let material_big_solid = wb.material_lambert_solid(Color::new_rgb(0.4, 0.2, 0.1));
+    scene = scene.add(wb.new_obj_sphere(1.0, material_big_solid).translate(Dir3::new(-4.0, 1.0, 0.0)));
+    let material_big_metal = wb.material_metal_solid(Color::new_rgb(0.7, 0.6, 0.5), 0.0);
+    scene = scene.add(wb.new_obj_sphere(1.0, material_big_metal).translate(Dir3::new(4.0, 1.0, 0.0)));
+
+    scene.build().finish(wb, background, camera)
 }
-*/
 
 pub fn create_world_defocus_blur<'a>(
     wb: &'a WorldBuilder<'a>,
@@ -592,6 +550,7 @@ pub fn create_world_defocus_blur<'a>(
         .look_at_focus(Dir3::UP, Point3::ORIGIN + Dir3::FORWARD)
         .aperture(0.1)
         .build();
+    let background = BackgroundColor::Sky;
 
     let material_ground = wb.material_lambert_solid(Color::new_rgb(0.8, 0.8, 0.0));
     let material_center = wb.material_lambert_solid(Color::new_rgb(0.7, 0.3, 0.3));
@@ -599,7 +558,7 @@ pub fn create_world_defocus_blur<'a>(
     let material_right = wb.material_metal_solid(Color::new_rgb(0.8, 0.6, 0.2), 0.5);
     let material_front = wb.material_dielectric(1.5);
 
-    let group = wb
+    let scene = wb
         .new_group()
         .add(
             wb.new_obj_sphere(100.0, material_ground)
@@ -623,11 +582,5 @@ pub fn create_world_defocus_blur<'a>(
         )
         .build();
 
-    let (hittable, scattering_distribution_provider) = group.finish(wb, &camera.time_interval);
-    World {
-        camera,
-        hittable,
-        background: BackgroundColor::Sky,
-        scattering_distribution_provider,
-    }
+    scene.finish(wb, background, camera)
 }

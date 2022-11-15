@@ -147,6 +147,9 @@ impl<'a> WorldBuilder<'a> {
     pub fn new_obj_sphere(&self, radius: f32, material: &'a Material) -> NodeBuilder {
         self.new_obj(self.geo_sphere(radius), material)
     }
+    pub fn new_obj_sphere_ground(&self, radius : f32, height : f32, material : &'a Material) -> NodeBuilder {
+        self.new_obj_sphere(radius, material).translate(Dir3::new(0.0, height-radius, 0.0))
+    }
     pub fn new_mesh_from_file_obj_uniform_material(
         &self,
         path: &std::path::Path,
@@ -234,10 +237,18 @@ impl<'a> NodeRef<'a> {
     pub fn finish(
         self,
         wb: &'a WorldBuilder<'a>,
-        time_range: &Range<f32>,
-    ) -> (&'a Scene<'a>, Option<WorldScatteringDistributionProvider>) {
-        let (root, wsd) = self.finish_internal(wb, time_range, &Transformation::ZERO);
-        (wb.alloc(Scene::new(root)), wsd)
+        background : BackgroundColor,
+        camera : Camera,
+    ) -> World<'a> {
+        let (root, scattering_distribution_provider) =
+        self.finish_internal(wb, &camera.time_interval, &Transformation::ZERO);
+        let hittable = wb.alloc(Scene::new(root));
+        World {
+            background,
+            camera,
+            hittable,
+            scattering_distribution_provider,
+        }
     }
     fn finish_internal(
         &self,
