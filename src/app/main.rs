@@ -23,13 +23,14 @@ fn main() -> Result<(), ImageError> {
     let wb = worlds::world_builder::WorldBuilder::new(&mut arena);
     let mut rng = TRng::from_seed([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     let world = match world_name {
-        "demo:cornell_box" => worlds::demo_worlds::create_world_cornell_box(&wb, &mut rng),
-        "demo:defocus_blur" => worlds::demo_worlds::create_world_defocus_blur(&wb, &mut rng),
-        "demo:simple_plane" => worlds::demo_worlds::create_world_simple_plane(&wb, &mut rng),
-        "demo:earth_mapped" => worlds::demo_worlds::create_world_earth_mapped(&wb, &mut rng),
-        "demo:suzanne" => worlds::demo_worlds::create_world_suzanne(&wb, &mut rng),
+        "demo:cornell_box" => worlds::demo_worlds::create_world_cornell_box,
+        "demo:defocus_blur" => worlds::demo_worlds::create_world_defocus_blur,
+        "demo:simple_plane" => worlds::demo_worlds::create_world_simple_plane,
+        "demo:earth_mapped" => worlds::demo_worlds::create_world_earth_mapped,
+        "demo:suzanne" => worlds::demo_worlds::create_world_suzanne,
+        "demo:moving_spheres" => worlds::demo_worlds::create_world_moving_spheres,
         _ => panic!(),
-    };
+    }(&wb, &mut rng);
     let image_size = Size2i::new(
         image_width,
         (image_width as f32 * world.camera.aspect_ratio()) as i32,

@@ -92,6 +92,7 @@ impl<'a> WorldBuilder<'a> {
         NodeBuilder(Box::new(Node {
             geo: Vec::new(),
             transformation: Transformation::ZERO,
+            moving_animation: Dir3::ZERO,
             children: Vec::new(),
         }))
     }
@@ -99,6 +100,7 @@ impl<'a> WorldBuilder<'a> {
         NodeBuilder(Box::new(Node {
             geo: vec![(geometry, material, false)],
             transformation: Transformation::ZERO,
+            moving_animation: Dir3::ZERO,
             children: Vec::new(),
         }))
     }
@@ -160,6 +162,7 @@ impl<'a> WorldBuilder<'a> {
         NodeBuilder(Box::new(Node {
             geo,
             transformation: Transformation::ZERO,
+            moving_animation: Dir3::ZERO,
             children: Vec::new(),
         }))
     }
@@ -168,6 +171,7 @@ impl<'a> WorldBuilder<'a> {
 struct Node<'a> {
     geo: Vec<(Geometry, &'a Material<'a>, bool)>,
     transformation: Transformation,
+    moving_animation: Dir3,
     children: Vec<NodeRef<'a>>,
 }
 
@@ -217,6 +221,10 @@ impl<'a> NodeBuilder<'a> {
         self.0.transformation = self.0.transformation.translate(offset);
         self
     }
+    pub fn animate_moving(mut self, velocity: Dir3) -> Self {
+        self.0.moving_animation += velocity;
+        self
+    }
     pub fn build(self) -> NodeRef<'a> {
         NodeRef(Rc::from(self.0))
     }
@@ -247,12 +255,13 @@ impl<'a> NodeRef<'a> {
         for (geo, material, is_poi) in &self.0.geo {
             let (real_geo, remaining_transformation) =
                 geo.partial_apply_transformation(&full_trans);
-            let geo_elem = wb.alloc(SceneElement::Geometry(real_geo, material));
-            let elem = if let Some(trans) = remaining_transformation {
-                wb.alloc(SceneElement::Transformation(geo_elem, trans))
-            } else {
-                geo_elem
-            };
+            let mut elem = wb.alloc(SceneElement::Geometry(real_geo, material));
+            if let Some(trans) = remaining_transformation {
+                elem = wb.alloc(SceneElement::Transformation(elem, trans))
+            }
+            if self.0.moving_animation != Dir3::ZERO {
+                elem = wb.alloc(SceneElement::Animation(elem, self.0.moving_animation))
+            }
             elements.push(elem);
             if *is_poi && remaining_transformation.is_none() && wsd.is_none() {
                 wsd = real_geo.get_world_scattering_provider()

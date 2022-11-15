@@ -82,7 +82,7 @@ impl Transformation {
         distance
     }
     pub fn then(&self, next: &Transformation) -> Transformation {
-        let offset = next.apply_direction(self.offset);
+        let offset = next.apply_direction(self.offset) + next.offset;
         let y_sine = self.y_sine * next.y_cosine + self.y_cosine * next.y_sine;
         let y_cosine = self.y_cosine * next.y_cosine - self.y_sine * next.y_sine;
         Transformation {

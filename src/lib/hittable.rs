@@ -112,6 +112,7 @@ pub enum Geometry {
 pub enum SceneElement<'a> {
     Group(Vec<&'a SceneElement<'a>>),
     Geometry(Geometry, &'a Material<'a>),
+    Animation(&'a SceneElement<'a>, Dir3),
     Transformation(&'a SceneElement<'a>, Transformation),
 }
 
@@ -216,6 +217,12 @@ impl<'a> SceneElement<'a> {
                 .hit(ray, t_range)
                 .map(|h| h.to_hit_interaction(material)),
             SceneElement::Transformation(elem, transform) => {
+                let ray_transformed = transform.reverse_ray(ray);
+                elem.hit(&ray_transformed, t_range, rng)
+                    .map(|h| transform.apply_hit_interaction(h))
+            }
+            SceneElement::Animation(elem, velocity) => {
+                let transform = Transformation::ZERO.translate(*velocity * ray.time);
                 let ray_transformed = transform.reverse_ray(ray);
                 elem.hit(&ray_transformed, t_range, rng)
                     .map(|h| transform.apply_hit_interaction(h))

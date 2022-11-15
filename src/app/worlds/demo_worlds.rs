@@ -446,11 +446,10 @@ pub fn create_world_earth_mapped<'a>(
     }
 }
 
-/*
 pub fn create_world_moving_spheres<'a>(
-    arena: &'a mut bumpalo::Bump,
+    wb: &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
-) -> World<impl Hittable + 'a> {
+) -> World<'a> {
     // One large sphere as ground,
     // One sphere moving fast from left to right
     // One sphere moving fast fro up to down
@@ -462,56 +461,45 @@ pub fn create_world_moving_spheres<'a>(
         .motion_blur(0.0, 0.5)
         .build();
 
-    let tex_red = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.6, 0.2, 0.2),
-    });
-    let tex_blue = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.2, 0.2, 0.6),
-    });
-    let tex_black = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(0.0, 0.0, 0.0),
-    });
-    let tex_white = arena.alloc(Texture::Solid {
-        color: Color::new_rgb(1.0, 1.0, 1.0),
-    });
-    let tex_ground = arena.alloc(Texture::Checker {
+    let tex_black = wb.texture_solid(Color::new_rgb(0.0, 0.0, 0.0));
+    let tex_white = wb.texture_solid(Color::new_rgb(1.0, 1.0, 1.0));
+    let tex_ground = wb.alloc(Texture::Checker {
         inv_frequency: 10.0,
         even: tex_black,
         odd: tex_white,
     });
-    let mat_ground = arena.alloc(Material::Lambert { albedo: tex_ground });
-    let mat_red = arena.alloc(Material::Lambert { albedo: tex_red });
-    let mat_blue = arena.alloc(Material::Lambert { albedo: tex_blue });
+    let mat_ground = wb.material_lambert(tex_ground);
+    let mat_red = wb.material_lambert_solid(Color::new_rgb(0.6, 0.2, 0.2));
+    let mat_blue = wb.material_lambert_solid(Color::new_rgb(0.2, 0.2, 0.6));
 
-    let hittable = {
-        let mut world = Vec::<Box<dyn Hittable>>::new();
-        let ground_radius = 100.0;
-        let ground_center = Point3::new(0.0, -ground_radius, 0.0);
-        world.push(Box::new(Sphere::new(
-            ground_center,
-            ground_radius,
-            mat_ground,
-        )));
+    let scene = wb
+        .new_group()
+        .add(
+            wb.new_obj_sphere(100.0, mat_ground)
+                .translate(Dir3::new(0.0, -100.0, 0.0)),
+        )
+        .add(
+            wb.new_obj_sphere(0.5, mat_red)
+                .translate(Dir3::new(-2.0, 1.5, 0.0))
+                .animate_moving(Dir3::new(2.0, 0.0, 0.0)),
+        )
+        .add(
+            wb.new_obj_sphere(0.5, mat_blue)
+                .translate(Dir3::new(0.0, 0.5, 0.0))
+                .animate_moving(Dir3::new(0.0, 1.0, 0.0)),
+        )
+        .build();
 
-        let sphere1 = arena.alloc(Sphere::new(Point3::new(-2.0, 1.5, 0.0), 0.5, mat_red));
-        let moving_sphere_1 = MovingHittable::new(sphere1, Dir3::new(2.0, 0.0, 0.0));
-
-        let sphere2 = arena.alloc(Sphere::new(Point3::new(0.0, 0.5, 0.0), 0.5, mat_blue));
-        let moving_sphere_2 = MovingHittable::new(sphere2, Dir3::new(0.0, 1.0, 0.0));
-
-        world.push(Box::new(moving_sphere_1));
-        world.push(Box::new(moving_sphere_2));
-
-        world
-    };
-
+    let (hittable, scattering_distribution_provider) = scene.finish(wb, &camera.time_interval);
     World {
         camera,
         hittable,
         background: BackgroundColor::Sky,
+        scattering_distribution_provider,
     }
 }
 
+/*
 pub fn create_world_random_scene<'a>(
     arena: &'a mut bumpalo::Bump,
     rng: &'a mut common::TRng,
