@@ -152,8 +152,14 @@ impl<'a> WorldBuilder<'a> {
     pub fn new_obj_sphere(&self, radius: f32, material: &'a Material) -> NodeBuilder {
         self.new_obj(self.geo_sphere(radius), material)
     }
-    pub fn new_obj_sphere_ground(&self, radius : f32, height : f32, material : &'a Material) -> NodeBuilder {
-        self.new_obj_sphere(radius, material).translate(Dir3::new(0.0, height-radius, 0.0))
+    pub fn new_obj_sphere_ground(
+        &self,
+        radius: f32,
+        height: f32,
+        material: &'a Material,
+    ) -> NodeBuilder {
+        self.new_obj_sphere(radius, material)
+            .translate(Dir3::new(0.0, height - radius, 0.0))
     }
     pub fn new_mesh_from_file_obj_uniform_material(
         &self,
@@ -174,7 +180,6 @@ impl<'a> WorldBuilder<'a> {
             children: Vec::new(),
         }))
     }
-
 }
 
 struct Node<'a> {
@@ -202,6 +207,12 @@ impl<'a> NodeLike<'a> for NodeBuilder<'a> {
 impl<'a> NodeLike<'a> for &NodeRef<'a> {
     fn get(self) -> NodeRef<'a> {
         self.clone()
+    }
+}
+
+impl<'a> NodeLike<'a> for NodeRef<'a> {
+    fn get(self) -> NodeRef<'a> {
+        self
     }
 }
 
@@ -234,12 +245,13 @@ impl<'a> NodeBuilder<'a> {
         self.0.moving_animation += velocity;
         self
     }
-    pub fn set_all_geo_densitity(mut self, densitity : f32) -> Self {
-        if densitity < 0.0 || densitity > 1.0 {
+    pub fn set_all_geo_densitity(mut self, densitity: f32) -> Self {
+        if (0.0..1.0).contains(&densitity) {
+            for geo in &mut self.0.geo {
+                geo.3 = densitity;
+            }
+        } else {
             panic!("Invalid densitity {densitity}")
-        }
-        for geo in &mut self.0.geo {
-            geo.3 = densitity;
         }
         self
     }
@@ -252,11 +264,11 @@ impl<'a> NodeRef<'a> {
     pub fn finish(
         self,
         wb: &'a WorldBuilder<'a>,
-        background : BackgroundColor,
-        camera : Camera,
+        background: BackgroundColor,
+        camera: Camera,
     ) -> World<'a> {
         let (root, scattering_distribution_provider) =
-        self.finish_internal(wb, &camera.time_interval, &Transformation::ZERO);
+            self.finish_internal(wb, &camera.time_interval, &Transformation::ZERO);
         let hittable = wb.alloc(Scene::new(root));
         World {
             background,
@@ -281,7 +293,7 @@ impl<'a> NodeRef<'a> {
         for (geo, material, is_poi, densitity) in &self.0.geo {
             let (real_geo, remaining_transformation) =
                 geo.partial_apply_transformation(&full_trans);
-            let mut elem = wb.alloc(if *densitity < 1.0 { 
+            let mut elem = wb.alloc(if *densitity < 1.0 {
                 SceneElement::VolumeGeometry(VolumeGeometry::new(real_geo, material, *densitity))
             } else {
                 SceneElement::SurfaceGeometry(real_geo, material)

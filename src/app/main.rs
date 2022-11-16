@@ -32,6 +32,7 @@ fn main() -> Result<(), ImageError> {
         "demo:moving_spheres" => worlds::demo_worlds::create_world_moving_spheres,
         "demo:final_scene1" => worlds::demo_worlds::create_world_final_scene1,
         "demo:perlin_spheres" => worlds::demo_worlds::create_world_perlin_spheres,
+        "demo:final_scene2" => worlds::demo_worlds::create_world_final_scene2,
         _ => panic!(),
     }(&wb, &mut rng);
     let image_size = Size2i::new(

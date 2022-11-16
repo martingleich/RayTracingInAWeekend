@@ -63,6 +63,11 @@ impl Transformation {
         self.apply_normal_mut(&mut dir);
         dir
     }
+    pub fn split_translation_remainder(&self) -> (Dir3, Transformation) {
+        let mut remainder = *self;
+        remainder.offset = Dir3::ZERO;
+        (self.offset, remainder)
+    }
     pub fn apply_direction(&self, mut dir: Dir3) -> Dir3 {
         self.apply_direction_mut(&mut dir);
         dir

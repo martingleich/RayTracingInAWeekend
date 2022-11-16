@@ -183,6 +183,18 @@ impl Geometry {
                     None,
                 )
             }
+            Geometry::AxisAlignedBox(geo) => {
+                let (translation, remainder) = transformation.split_translation_remainder();
+                let new = Aabb::new_corners(geo.min + translation, geo.max + translation);
+                (
+                    Geometry::AxisAlignedBox(new),
+                    if remainder.is_zero() {
+                        None
+                    } else {
+                        Some(remainder)
+                    },
+                )
+            }
             geo => (
                 *geo,
                 if transformation.is_zero() {
