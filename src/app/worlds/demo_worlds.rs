@@ -1,7 +1,7 @@
 use rand::Rng;
 use ray_tracing_in_a_weekend::*;
 
-use super::world_builder::WorldBuilder;
+use super::world_builder::{WorldBuilder, NodeRef};
 
 pub fn create_world_suzanne<'a>(wb: &'a WorldBuilder<'a>, _rng: &'a mut common::TRng) -> World<'a> {
     let camera = Camera::build()
@@ -153,152 +153,29 @@ pub fn create_world_final_scene2<'a>(
         hittable,
     }
 }
-
-pub fn create_world_perlin_spheres<'a>(
-    arena: &'a mut bumpalo::Bump,
-    rng: &mut common::TRng,
-) -> World<impl Hittable + 'a> {
+*/
+pub fn create_world_perlin_spheres<'a>(wb: &'a WorldBuilder<'a>, rng: &'a mut common::TRng) -> World<'a> {
     let camera = Camera::build()
         .vertical_fov(40.0, 3.0 / 4.0)
         .position(Point3::new(13.0, 2.0, 3.0))
         .look_at(Dir3::UP, Point3::new(0.0, 0.0, 0.0))
         .build();
+    let background = BackgroundColor::Sky;
 
-    let texture_noise = arena.alloc(Texture::Marble {
+    let tex_noise = wb.alloc(Texture::Marble {
         noise: Perlin::new(8, rng),
         scale: 4.0,
     });
-    let material_noise = arena.alloc(Material::Lambert {
-        albedo: texture_noise,
-    });
-    let hittable = vec![
-        Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, material_noise),
-        Sphere::new(Point3::new(0.0, 2.0, 0.0), 2.0, material_noise),
-    ];
-    World {
-        background: BackgroundColor::Sky,
-        camera,
-        hittable,
-    }
+    let mat_noise = wb.material_lambert(tex_noise);
+    let scene = wb.new_group()
+        .add(wb.new_obj_sphere_ground(1000.0, 0.0, mat_noise))
+        .add(wb.new_obj_sphere(2.0, mat_noise).translate(Dir3::new(0.0, 2.0, 0.0)))
+        .build();
+
+    scene.finish(wb, background, camera)
 }
 
 pub fn create_world_cornell_box_smoke<'a>(
-    arena: &'a mut bumpalo::Bump,
-    _rng: &'a mut common::TRng,
-) -> World<impl Hittable + '_> {
-    let hsize = 278.0;
-    let camera = Camera::build()
-        .vertical_fov(40.0, 1.0)
-        .position(Point3::new(hsize, hsize, -800.0))
-        .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
-        .build();
-
-    let red = solid_lambert(arena, Color::new_rgb(0.65, 0.05, 0.05));
-    let white = solid_lambert(arena, Color::new_rgb(0.73, 0.73, 0.73));
-    let green = solid_lambert(arena, Color::new_rgb(0.12, 0.45, 0.15));
-    let smoke_black = smoke(arena, Color::new_rgb(0.0, 0.0, 0.0));
-    let smoke_white = smoke(arena, Color::new_rgb(1.0, 1.0, 1.0));
-    let light = solid_diffuse_light(arena, Color::new_rgb(7.0, 7.0, 7.0));
-
-    let hittable: Vec<Box<dyn Hittable>> = {
-        let walls = vec![
-            Rect::new_yz(
-                Point3::new(0.0, hsize, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                red,
-            ),
-            Rect::new_yz(
-                Point3::new(2.0 * hsize, hsize, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                green,
-            ),
-            Rect::new_xz(
-                Point3::new(hsize, 0.0, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                white,
-            ),
-            Rect::new_xz(
-                Point3::new(hsize, 2.0 * hsize, hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                white,
-            ),
-            Rect::new_xy(
-                Point3::new(hsize, hsize, 2.0 * hsize),
-                2.0 * hsize,
-                2.0 * hsize,
-                white,
-            ),
-            Rect::new_xz(
-                Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
-                300.0,
-                300.0,
-                light,
-            ),
-        ];
-
-        let boxes = {
-            // let mut boxes = HittableList::new();
-            // let sphere = arena.alloc(Sphere::new(Point3::new(265.0, 150.0, 295.0), 100.0, smoke_black));
-            // boxes.push(ConstantMedium::new(sphere, smoke_black, 0.01));
-            let mut boxes = Vec::new();
-            let box1_base = arena.alloc(AxisAlignedBox::new(
-                &Aabb {
-                    min: Point3::new(0.0, 0.0, 0.0),
-                    max: Point3::new(165.0, 330.0, 165.0),
-                },
-                white,
-            ));
-            let box1_rot = arena.alloc(TransformedHittable {
-                hittable: box1_base,
-                transformation: RotationAroundUp::new(15.0),
-            });
-            let box1 = arena.alloc(TransformedHittable {
-                hittable: box1_rot,
-                transformation: Translation {
-                    offset: Dir3::new(265.0, 0.0, 295.0),
-                },
-            });
-            boxes.push(ConstantMedium::new(box1, smoke_white, 0.01));
-
-            let box2_base = arena.alloc(AxisAlignedBox::new(
-                &Aabb {
-                    min: Point3::new(0.0, 0.0, 0.0),
-                    max: Point3::new(165.0, 165.0, 165.0),
-                },
-                white,
-            ));
-            let box2_rot = arena.alloc(TransformedHittable {
-                hittable: box2_base,
-                transformation: RotationAroundUp::new(-18.0),
-            });
-            let box2 = arena.alloc(TransformedHittable {
-                hittable: box2_rot,
-                transformation: Translation {
-                    offset: Dir3::new(130.0, 0.0, 65.0),
-                },
-            });
-            boxes.push(ConstantMedium::new(box2, smoke_black, 0.01));
-
-            boxes
-        };
-
-        vec![Box::new(walls), Box::new(boxes)]
-    };
-
-    World {
-        background: BackgroundColor::Solid {
-            color: Color::BLACK,
-        },
-        camera,
-        hittable,
-    }
-}
- */
-pub fn create_world_cornell_box<'a>(
     wb: &'a WorldBuilder<'a>,
     _rng: &'a mut common::TRng,
 ) -> World<'a> {
@@ -310,12 +187,36 @@ pub fn create_world_cornell_box<'a>(
         .build();
     let background = BackgroundColor::Solid { color: Color::BLACK };
 
+    let smoke_black = wb.material_isotropic_solid(Color::new_rgb(0.0, 0.0, 0.0));
+    let smoke_white = wb.material_isotropic_solid(Color::new_rgb(1.0, 1.0, 1.0));
+    let cornell_box = create_cornell_box_node(wb, 130.0);
+    
+    let scene = wb.new_group()
+        .add(&cornell_box)
+        .add(
+            wb.new_obj_box(165.0, 330.0, 165.0, smoke_white)
+                .rotate_around_up(15.0)
+                .translate(Dir3::new(265.0, 0.0, 295.0))
+                .set_all_geo_densitity(0.01),
+        )
+        .add(
+            wb.new_obj_box(165.0, 165.0, 165.0, smoke_black)
+                .rotate_around_up(-18.0)
+                .translate(Dir3::new(130.0, 0.0, 65.0))
+                .set_all_geo_densitity(0.01),
+        )
+        .build();
+    scene.finish(wb, background, camera)
+}
+
+pub fn create_cornell_box_node<'a>(wb: &'a WorldBuilder<'a>, light_size : f32) -> NodeRef<'a> {
     let red = wb.material_lambert_solid(Color::new_rgb(0.65, 0.05, 0.05));
     let white = wb.material_lambert_solid(Color::new_rgb(0.73, 0.73, 0.73));
     let green = wb.material_lambert_solid(Color::new_rgb(0.12, 0.45, 0.15));
     let light = wb.material_diffuse_light_solid(Color::new_rgb(15.0, 15.0, 15.0));
+    let hsize = 278.0;
 
-    let scene = wb
+    wb
         .new_group()
         .add(wb.new_obj_rect_yz(
             Point3::new(0.0, hsize, hsize),
@@ -350,12 +251,31 @@ pub fn create_world_cornell_box<'a>(
         .add(
             wb.new_obj_rect_xz(
                 Point3::new(hsize, 2.0 * hsize - 1.0, hsize),
-                130.0,
-                130.0,
+                light_size,
+                light_size,
                 light,
             )
             .set_all_geo_as_poi(),
         )
+
+        .build()
+}
+
+pub fn create_world_cornell_box<'a>(
+    wb: &'a WorldBuilder<'a>,
+    _rng: &'a mut common::TRng,
+) -> World<'a> {
+    let hsize = 278.0;
+    let camera = Camera::build()
+        .vertical_fov(40.0, 1.0)
+        .position(Point3::new(hsize, hsize, -800.0))
+        .look_at(Dir3::UP, Point3::new(hsize, hsize, 0.0))
+        .build();
+    let white = wb.material_lambert_solid(Color::new_rgb(0.73, 0.73, 0.73));
+    let background = BackgroundColor::Solid { color: Color::BLACK };
+    let cornell_box = create_cornell_box_node(wb, 130.0);
+    let scene = wb.new_group()
+        .add(&cornell_box)
         .add(
             wb.new_obj_box(165.0, 330.0, 165.0, white)
                 .rotate_around_up(15.0)
@@ -367,7 +287,6 @@ pub fn create_world_cornell_box<'a>(
                 .translate(Dir3::new(130.0, 0.0, 65.0)),
         )
         .build();
-
     scene.finish(wb, background, camera)
 }
 

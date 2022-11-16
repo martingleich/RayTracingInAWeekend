@@ -51,6 +51,11 @@ impl<'a> WorldBuilder<'a> {
         })
     }
 
+    pub(crate) fn material_isotropic_solid(&self, color: Color) -> &Material {
+        let albedo = self.texture_solid(color);
+        self.alloc(Material::Isotropic { albedo })
+    }
+
     fn geo_rect_xy(&self, center: Point3, s0: f32, s1: f32) -> Geometry {
         self.geo_rect(RectPlane::Xy, center, s0, s1)
     }
@@ -98,7 +103,7 @@ impl<'a> WorldBuilder<'a> {
     }
     pub fn new_obj(&self, geometry: Geometry, material: &'a Material<'a>) -> NodeBuilder {
         NodeBuilder(Box::new(Node {
-            geo: vec![(geometry, material, false)],
+            geo: vec![(geometry, material, false, 1.0)],
             transformation: Transformation::ZERO,
             moving_animation: Dir3::ZERO,
             children: Vec::new(),
@@ -160,7 +165,7 @@ impl<'a> WorldBuilder<'a> {
         let tris = crate::obj_loader::load_obj_mesh(reader).unwrap();
         let geo = tris
             .into_iter()
-            .map(|t| (Geometry::Triangle(t), material, false))
+            .map(|t| (Geometry::Triangle(t), material, false, 1.0))
             .collect::<Vec<_>>();
         NodeBuilder(Box::new(Node {
             geo,
@@ -169,10 +174,11 @@ impl<'a> WorldBuilder<'a> {
             children: Vec::new(),
         }))
     }
+
 }
 
 struct Node<'a> {
-    geo: Vec<(Geometry, &'a Material<'a>, bool)>,
+    geo: Vec<(Geometry, &'a Material<'a>, bool, f32)>,
     transformation: Transformation,
     moving_animation: Dir3,
     children: Vec<NodeRef<'a>>,
@@ -228,6 +234,15 @@ impl<'a> NodeBuilder<'a> {
         self.0.moving_animation += velocity;
         self
     }
+    pub fn set_all_geo_densitity(mut self, densitity : f32) -> Self {
+        if densitity < 0.0 || densitity > 1.0 {
+            panic!("Invalid densitity {densitity}")
+        }
+        for geo in &mut self.0.geo {
+            geo.3 = densitity;
+        }
+        self
+    }
     pub fn build(self) -> NodeRef<'a> {
         NodeRef(Rc::from(self.0))
     }
@@ -263,10 +278,14 @@ impl<'a> NodeRef<'a> {
 
         let full_trans = parent_transform.then(&self.0.transformation);
         let mut wsd = None;
-        for (geo, material, is_poi) in &self.0.geo {
+        for (geo, material, is_poi, densitity) in &self.0.geo {
             let (real_geo, remaining_transformation) =
                 geo.partial_apply_transformation(&full_trans);
-            let mut elem = wb.alloc(SceneElement::Geometry(real_geo, material));
+            let mut elem = wb.alloc(if *densitity < 1.0 { 
+                SceneElement::VolumeGeometry(VolumeGeometry::new(real_geo, material, *densitity))
+            } else {
+                SceneElement::SurfaceGeometry(real_geo, material)
+            });
             if let Some(trans) = remaining_transformation {
                 elem = wb.alloc(SceneElement::Transformation(elem, trans))
             }

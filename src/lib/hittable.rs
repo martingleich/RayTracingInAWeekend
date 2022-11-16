@@ -111,7 +111,8 @@ pub enum Geometry {
 
 pub enum SceneElement<'a> {
     Group(Vec<&'a SceneElement<'a>>),
-    Geometry(Geometry, &'a Material<'a>),
+    SurfaceGeometry(Geometry, &'a Material<'a>),
+    VolumeGeometry(VolumeGeometry<'a>),
     Animation(&'a SceneElement<'a>, Dir3),
     Transformation(&'a SceneElement<'a>, Transformation),
 }
@@ -213,9 +214,10 @@ impl<'a> SceneElement<'a> {
                 }
                 closest
             }
-            SceneElement::Geometry(geo, material) => geo
+            SceneElement::SurfaceGeometry(geo, material) => geo
                 .hit(ray, t_range)
                 .map(|h| h.to_hit_interaction(material)),
+            SceneElement::VolumeGeometry(volume_geometry) => volume_geometry.hit(ray, t_range, rng),
             SceneElement::Transformation(elem, transform) => {
                 let ray_transformed = transform.reverse_ray(ray);
                 elem.hit(&ray_transformed, t_range, rng)
@@ -255,14 +257,14 @@ impl Transformation {
     }
 }
 
-pub struct ConstantMedium<'a> {
-    boundary: &'a Geometry,
+pub struct VolumeGeometry<'a> {
+    boundary: Geometry,
     phase_function: &'a Material<'a>,
     neg_inv_density: f32,
 }
 
-impl<'a> ConstantMedium<'a> {
-    pub fn new(boundary: &'a Geometry, phase_function: &'a Material<'a>, density: f32) -> Self {
+impl<'a> VolumeGeometry<'a> {
+    pub fn new(boundary: Geometry, phase_function: &'a Material<'a>, density: f32) -> Self {
         Self {
             boundary,
             phase_function,

@@ -24,12 +24,14 @@ fn main() -> Result<(), ImageError> {
     let mut rng = TRng::from_seed([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     let world = match world_name {
         "demo:cornell_box" => worlds::demo_worlds::create_world_cornell_box,
+        "demo:cornell_box_smoke" => worlds::demo_worlds::create_world_cornell_box_smoke,
         "demo:defocus_blur" => worlds::demo_worlds::create_world_defocus_blur,
         "demo:simple_plane" => worlds::demo_worlds::create_world_simple_plane,
         "demo:earth_mapped" => worlds::demo_worlds::create_world_earth_mapped,
         "demo:suzanne" => worlds::demo_worlds::create_world_suzanne,
         "demo:moving_spheres" => worlds::demo_worlds::create_world_moving_spheres,
         "demo:final_scene1" => worlds::demo_worlds::create_world_final_scene1,
+        "demo:perlin_spheres" => worlds::demo_worlds::create_world_perlin_spheres,
         _ => panic!(),
     }(&wb, &mut rng);
     let image_size = Size2i::new(
