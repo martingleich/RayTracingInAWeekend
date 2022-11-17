@@ -97,8 +97,12 @@ pub fn create_world_final_scene2<'a>(
                 .set_all_geo_densitity(0.2),
         )
         .add(
-            wb.new_obj_sphere(50.0, mat_metal)
+            wb.new_obj_sphere(50.0, mat_glass)
                 .translate(Dir3::new(260.0, 150.0, 45.0)),
+        )
+        .add(
+            wb.new_obj_sphere(50.0, mat_metal)
+                .translate(Dir3::new(0.0, 150.0, 145.0)),
         )
         .add(
             wb.new_obj_sphere(80.0, mat_marble)
