@@ -34,6 +34,21 @@ impl Aabb {
             max: Point3::new_from_arr(max),
         }
     }
+    pub fn new_surrounding_maybe_boxes_iter<TIter : Iterator<Item=Option<Aabb>>>(boxes: TIter) -> Option<Self> {
+        let mut result = Option::<Aabb>::None;
+        for bounding_box in boxes {
+            if let Some(bb) = bounding_box {
+                if let Some(r) = result {
+                    result = Some(Aabb::new_surrounding_boxes(&[r, bb]))
+                } else {
+                    result = Some(bb)
+                }
+            } else {
+                return None
+            }
+        }
+        result
+    }
     pub fn new_surrounding_points(points: &[Point3]) -> Self {
         let mut min = points[0].0.e;
         let mut max = points[0].0.e;

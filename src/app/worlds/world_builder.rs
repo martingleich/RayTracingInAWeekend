@@ -267,8 +267,10 @@ impl<'a> NodeRef<'a> {
         background: BackgroundColor,
         camera: Camera,
     ) -> World<'a> {
-        let (root, scattering_distribution_provider) =
-            self.finish_internal(wb, &camera.time_interval, &Transformation::ZERO);
+        let mut all_elements = Vec::new();
+        let scattering_distribution_provider =
+            self.finish_internal(wb, &camera.time_interval, &Transformation::ZERO, &mut all_elements);
+        let root = wb.alloc(SceneElement::BoundingVolumeHierarchy(BoundingVolumeHierarchy::new(all_elements, &camera.time_interval)));
         let hittable = wb.alloc(Scene::new(root));
         World {
             background,
@@ -282,12 +284,10 @@ impl<'a> NodeRef<'a> {
         wb: &'a WorldBuilder<'a>,
         time_range: &Range<f32>,
         parent_transform: &Transformation,
-    ) -> (
-        &'a SceneElement<'a>,
-        Option<WorldScatteringDistributionProvider>,
-    ) {
-        let mut elements = Vec::<&'a SceneElement<'a>>::new();
-
+        result : &mut Vec<&'a SceneElement<'a>>
+    ) -> 
+        Option<WorldScatteringDistributionProvider>
+     {
         let full_trans = parent_transform.then(&self.0.transformation);
         let mut wsd = None;
         for (geo, material, is_poi, densitity) in &self.0.geo {
@@ -304,23 +304,17 @@ impl<'a> NodeRef<'a> {
             if self.0.moving_animation != Dir3::ZERO {
                 elem = wb.alloc(SceneElement::Animation(elem, self.0.moving_animation))
             }
-            elements.push(elem);
+            result.push(elem);
             if *is_poi && remaining_transformation.is_none() && wsd.is_none() {
                 wsd = real_geo.get_world_scattering_provider()
             }
         }
         for child in &self.0.children {
-            let (e, child_wsd) = child.finish_internal(wb, time_range, &full_trans);
-            elements.push(e);
+            let child_wsd = child.finish_internal(wb, time_range, &full_trans, result);
             if wsd.is_none() && child_wsd.is_some() {
                 wsd = child_wsd;
             }
         }
-        let root = if elements.len() != 1 {
-            wb.alloc(SceneElement::Group(elements))
-        } else {
-            elements[0]
-        };
-        (root, wsd)
+        wsd
     }
 }

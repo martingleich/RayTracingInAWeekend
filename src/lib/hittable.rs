@@ -111,6 +111,7 @@ pub enum Geometry {
 
 pub enum SceneElement<'a> {
     Group(Vec<&'a SceneElement<'a>>),
+    BoundingVolumeHierarchy(BoundingVolumeHierarchy<'a>),
     SurfaceGeometry(Geometry, &'a Material<'a>),
     VolumeGeometry(VolumeGeometry<'a>),
     Animation(&'a SceneElement<'a>, Dir3),
@@ -146,7 +147,7 @@ impl Geometry {
         }
     }
 
-    pub fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
+    pub fn bounding_box(&self) -> Option<Aabb> {
         match self {
             Geometry::Sphere(geo) => Some(geo.bounding_box()),
             Geometry::Rect(geo) => Some(geo.bounding_box(0.01)),
@@ -241,6 +242,27 @@ impl<'a> SceneElement<'a> {
                 elem.hit(&ray_transformed, t_range, rng)
                     .map(|h| transform.apply_hit_interaction(h))
             }
+            SceneElement::BoundingVolumeHierarchy(bvh) => bvh.hit(ray, t_range, rng),
+        }
+    }
+
+    pub fn bounding_box(&self, time_range : &Range<f32>) -> Option<Aabb> {
+        match self {
+            SceneElement::Group(elements) => Aabb::new_surrounding_maybe_boxes_iter(elements.iter().map(|b| b.bounding_box(time_range))),
+            SceneElement::SurfaceGeometry(geo, _) => geo.bounding_box(),
+            SceneElement::VolumeGeometry(volume) => volume.boundary.bounding_box(),
+            SceneElement::Animation(geo, velocity) => {
+                geo.bounding_box(time_range).map(|aabb| 
+                {
+                    let start = Transformation::ZERO.translate(*velocity * time_range.start);
+                    let end = Transformation::ZERO.translate(*velocity * time_range.end);
+                    let start_box = start.apply_aabb(aabb);
+                    let end_box = end.apply_aabb(aabb);
+                    Aabb::new_surrounding_boxes(&[start_box, end_box])
+                })
+            },
+            SceneElement::Transformation(elem, trans) => elem.bounding_box(time_range).map(|b| trans.apply_aabb(b)),
+            SceneElement::BoundingVolumeHierarchy(bvh) => bvh.bounding_box(time_range),
         }
     }
 }
@@ -297,24 +319,17 @@ impl<'a> VolumeGeometry<'a> {
         let next = start_boundary + 0.001;
         let end_boundary = self.boundary.hit(ray, &(next..f32::INFINITY))?.t;
 
-        let mut start_medium = start_boundary.max(t_range.start);
+        let start_medium = start_boundary.max(t_range.start);
         let end_medium = end_boundary.min(t_range.end);
         if start_medium >= end_medium {
             return None;
         }
 
-        if start_medium < 0.0 {
-            start_medium = 0.0;
-        }
-
-        let distance_inside_boundary = end_medium - start_medium;
-        let hit_distance = self.neg_inv_density * rng.gen::<f32>().ln();
-
-        if hit_distance > distance_inside_boundary {
+        let t = start_medium.max(0.0) + self.neg_inv_density * rng.gen::<f32>().ln();
+        if t > end_medium {
             return None;
         }
 
-        let t = start_medium + hit_distance;
         Some(HitInteraction {
             position: ray.at(t),
             normal: Dir3::UP, // Arbitrary
@@ -324,13 +339,9 @@ impl<'a> VolumeGeometry<'a> {
             material: self.phase_function,
         })
     }
-
-    pub fn bounding_box(&self, time_range: &Range<f32>) -> Option<Aabb> {
-        self.boundary.bounding_box(time_range)
-    }
 }
 
-/*
+
 #[derive(Default, Debug, Clone, Copy)]
 struct BoundingVolumeNode {
     aabb: Aabb,
@@ -339,27 +350,30 @@ struct BoundingVolumeNode {
     right: usize,
 }
 pub struct BoundingVolumeHierarchy<'a> {
-    items: Vec<&'a Hittable<'a>>,
+    items: Vec<&'a SceneElement<'a>>,
+    unbounded_items : Vec<usize>,
     nodes: Vec<BoundingVolumeNode>,
     initial_index: usize,
 }
 
 impl<'a> BoundingVolumeHierarchy<'a> {
-    pub fn new(items: Vec<&'a Hittable>, time_range: &Range<f32>) -> Self {
-        let mut hittables = items
+    pub fn new(items: Vec<&'a SceneElement<'a>>, time_range: &Range<f32>) -> Self {
+        let hittables = items
             .iter()
-            .map(|h| h.bounding_box(time_range).unwrap())
+            .map(|h| h.bounding_box(time_range))
             .enumerate()
             .map(|mut x| {
                 x.0 = usize::MAX - x.0;
                 x
             })
             .collect::<Vec<_>>();
+        let mut bounded_items = hittables.iter().filter_map(|(id, aabb)| aabb.map(|b| (*id, b))).collect::<Vec<_>>();
+        let unbounded_items = hittables.iter().filter_map(|(id, aabb)| if aabb.is_none() { Some(*id) } else { None }).collect::<Vec<_>>();
         let mut nodes = Vec::<BoundingVolumeNode>::new();
-        let (initial_index, _, _) = Self::_new(&mut hittables[..], &mut nodes, 0, 0);
-        //eprint!("{depth}");
+        let (initial_index, _, _) = Self::_new(&mut bounded_items[..], &mut nodes, 0, 0);
         Self {
             items,
+            unbounded_items,
             nodes,
             initial_index,
         }
@@ -412,7 +426,7 @@ impl<'a> BoundingVolumeHierarchy<'a> {
         }
     }
 
-    fn _hit(
+    fn hit_recursive(
         &self,
         node: usize,
         ray: &Ray,
@@ -421,35 +435,30 @@ impl<'a> BoundingVolumeHierarchy<'a> {
     ) -> Option<HitInteraction> {
         if node > self.items.len() {
             self.items[usize::MAX - node].hit(ray, t_range, rng)
-        } else if self.nodes[node].aabb.hit(ray, t_range) {
+        } else if self.nodes[node].aabb.hit_cond(ray, t_range) {
             // Check the sides in the order in which the ray points(i.e. ray points from left to right -> first check left, then right)
-            // We still have to check both sides, so we can correctly handle elements on the seperator(TODO: Add these elements to both sides)
-            if ray.direction.0.e[self.nodes[node].axis_id] > 0.0 {
-                let interaction1 = self._hit(self.nodes[node].left, ray, t_range, rng);
-                if let Some(hi) = &interaction1 {
-                    t_range.end = hi.t;
-                }
-                let interaction2 = self._hit(self.nodes[node].right, ray, t_range, rng);
-                if let Some(hi) = &interaction2 {
-                    t_range.end = hi.t;
-                    return interaction2;
-                }
-                interaction1
+            // We still have to check both sides, so we can correctly handle elements on the seperator
+            let order = if ray.direction.0.e[self.nodes[node].axis_id] > 0.0 {
+                [self.nodes[node].left, self.nodes[node].right]
             } else {
-                let interaction1 = self._hit(self.nodes[node].right, ray, t_range, rng);
-                if let Some(hi) = &interaction1 {
-                    t_range.end = hi.t;
-                }
-                let interaction2 = self._hit(self.nodes[node].left, ray, t_range, rng);
-                if let Some(hi) = &interaction2 {
-                    t_range.end = hi.t;
-                    return interaction2;
-                }
-                interaction1
-            }
+                [self.nodes[node].right, self.nodes[node].left]
+            };
+
+            self.hit_index_list(&order, ray, t_range, rng)
         } else {
             None
         }
+    }
+
+    fn hit_index_list(&self, order: &[usize], ray: &Ray, t_range: &mut Range<f32>, rng: &mut rand_xoshiro::Xoroshiro128PlusPlus) -> Option<HitInteraction> {
+        let mut interaction = None;
+        for id in order {
+            if let Some(hi) = self.hit_recursive(*id, ray, t_range, rng) {
+                t_range.end = hi.t;
+                interaction = Some(hi);
+            }
+        }
+        interaction
     }
 
     pub fn hit(
@@ -459,15 +468,15 @@ impl<'a> BoundingVolumeHierarchy<'a> {
         rng: &mut common::TRng,
     ) -> Option<HitInteraction> {
         let mut t_range = t_range.clone();
-        self._hit(self.initial_index, ray, &mut t_range, rng)
+        let closest: Option<HitInteraction> = self.hit_index_list(&self.unbounded_items[..], ray, &mut t_range, rng);
+        self.hit_recursive(self.initial_index, ray, &mut t_range, rng).or(closest)
     }
 
     pub fn bounding_box(&self, _time_range: &Range<f32>) -> Option<Aabb> {
-        if self.initial_index < self.nodes.len() {
+        if self.unbounded_items.len() == 0 && self.initial_index < self.nodes.len() {
             Some(self.nodes[self.initial_index].aabb)
         } else {
             None
         }
     }
 }
- */
