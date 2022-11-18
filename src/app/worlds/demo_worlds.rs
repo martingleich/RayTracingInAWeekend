@@ -72,10 +72,7 @@ pub fn create_world_final_scene2<'a>(
 
     let mat_glass = wb.material_dielectric(1.5);
     let mat_metal = wb.material_metal_solid(Color::new_rgb(0.8, 0.8, 0.9), 1.0);
-    let tex_marble = wb.alloc(Texture::Marble {
-        scale: 0.1,
-        noise: Perlin::new(8, rng),
-    });
+    let tex_marble = wb.texture_marble(0.1, rng);
     let mat_marble = wb.material_lambert(tex_marble);
     let tex_earth = wb.texture_image_from_file(
         std::path::Path::new("input/earthmap.jpg"),
@@ -165,10 +162,7 @@ pub fn create_world_perlin_spheres<'a>(
         .build();
     let background = BackgroundColor::Sky;
 
-    let tex_noise = wb.alloc(Texture::Marble {
-        noise: Perlin::new(8, rng),
-        scale: 4.0,
-    });
+    let tex_noise = wb.texture_marble(4.0, rng);
     let mat_noise = wb.material_lambert(tex_noise);
     let scene = wb
         .new_group()
@@ -372,11 +366,7 @@ pub fn create_world_moving_spheres<'a>(
 
     let tex_black = wb.texture_solid(Color::new_rgb(0.0, 0.0, 0.0));
     let tex_white = wb.texture_solid(Color::new_rgb(1.0, 1.0, 1.0));
-    let tex_ground = wb.alloc(Texture::Checker {
-        inv_frequency: 10.0,
-        even: tex_black,
-        odd: tex_white,
-    });
+    let tex_ground = wb.texture_checker(10.0, tex_black, tex_white);
     let mat_ground = wb.material_lambert(tex_ground);
     let mat_red = wb.material_lambert_solid(Color::new_rgb(0.6, 0.2, 0.2));
     let mat_blue = wb.material_lambert_solid(Color::new_rgb(0.2, 0.2, 0.6));

@@ -29,6 +29,15 @@ impl<'a> WorldBuilder<'a> {
             image: image.as_rgb8().unwrap(),
         })
     }
+    pub fn texture_marble(&self, scale : f32, rng : &mut common::TRng) -> &Texture {
+        self.alloc(Texture::Marble {
+            scale,
+            noise: Perlin::new(8, rng),
+        })     
+    }
+    pub fn texture_checker(&'a self, inv_frequency : f32, tex_even : &'a Texture, tex_odd : &'a Texture) -> &Texture {
+        self.alloc(Texture::Checker { inv_frequency, even: tex_even, odd: tex_odd })
+    }
     pub fn material_diffuse_light_solid(&self, color: Color) -> &Material {
         let emit = self.texture_solid(color);
         self.alloc(Material::DiffuseLight { emit })
@@ -51,7 +60,7 @@ impl<'a> WorldBuilder<'a> {
         })
     }
 
-    pub(crate) fn material_isotropic_solid(&self, color: Color) -> &Material {
+    pub fn material_isotropic_solid(&self, color: Color) -> &Material {
         let albedo = self.texture_solid(color);
         self.alloc(Material::Isotropic { albedo })
     }
@@ -89,7 +98,7 @@ impl<'a> WorldBuilder<'a> {
         })
     }
 
-    pub fn alloc<T>(&self, v: T) -> &mut T {
+    fn alloc<T>(&self, v: T) -> &mut T {
         self.arena.alloc(v)
     }
 
